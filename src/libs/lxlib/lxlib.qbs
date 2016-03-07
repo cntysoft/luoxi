@@ -19,7 +19,8 @@ Product
          defines.push("LUOXI_LIBRARY");
       }
       defines = defines.concat([
-                                  'UMS_LIB_VERSION="'+ version+'"'
+                                  'LUOXI_LIB_VERSION="'+ version+'"',
+                                  'LUOXI_VERSION="' + project.luoxiVersion + '"'
                                ]);
       return defines;
    }
@@ -36,5 +37,23 @@ Product
       fileTagsFilter: product.type.concat("dynamiclibrary_symlink")
       qbs.install: true
       qbs.installDir: "lib"
+   }
+   Group {
+      name: "global"
+      prefix: name+"/"
+      files: [
+           "common_funcs.cpp",
+           "common_funcs.h",
+           "const.h",
+           "global.h",
+       ]
+   }
+   Group {
+      name : "network"
+      prefix : name + "/"
+      files : [
+         "multi_thread_server.cpp",
+         "multi_thread_server.h"	
+      ]
    }
 }

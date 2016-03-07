@@ -8,7 +8,7 @@ Project
    property string libDirName: "lib"
    property string appInstallDir : "bin"
    property string resourcesInstallDir: "share"
-   property string upgrademgrMasterversion: "v0.0.1"
+   property string luoxiVersion: "0.0.1"
    property stringList libRPaths: {
       if (!enableRPath){
          return undefined;
