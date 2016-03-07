@@ -2,31 +2,32 @@ import qbs 1.0
 Product
 {
    type: "dynamiclibrary"
-   name : "lxlib"
-   targetName : "lx"
+   name : "lxservicelib"
+   targetName : "lxservice"
    Depends { 
       name: "Qt"; 
-      submodules: ["core", "network","websockets"]
+      submodules: ["core", "network","websockets","qml"]
    }
    Depends { name:"corelib"}
+   Depends { name:"lxlib"}
    Depends { name:"cpp"}
    destinationDirectory: "lib"
    cpp.defines: {
       var defines = [];
       if(product.type == "staticlibrary"){
-         defines.push("LUOXI_STATIC_LIB");
+         defines.push("LUOXI_SERVICE_STATIC_LIB");
       }else{
-         defines.push("LUOXI_LIBRARY");
+         defines.push("LUOXI_SERVICE_LIBRARY");
       }
       defines = defines.concat([
-                                  'LUOXI_LIB_VERSION="'+ version+'"',
-                                  'LUOXI_VERSION="' + project.luoxiVersion + '"'
+                                  'LUOXI_SERVICE_LIB_VERSION="'+ version+'"',
+                                  'LUOXI_VERSION="' + project.luoxiVersion+'"'
                                ]);
       return defines;
    }
    cpp.visibility: "minimal"
    cpp.cxxLanguageVersion: "c++14"
-   cpp.includePaths:[".","../lxlib/", "../"]
+   cpp.includePaths:[".","../lxlib/", "../lxservicelib/", "../"]
    Export {
       Depends { name: "cpp" }
       Depends { name: "Qt"; submodules: ["core"] }
@@ -38,22 +39,9 @@ Product
       qbs.install: true
       qbs.installDir: "lib"
    }
-   Group {
-      name: "global"
-      prefix: name+"/"
-      files: [
-           "common_funcs.cpp",
-           "common_funcs.h",
-           "const.h",
-           "global.h",
-       ]
-   }
-   Group {
-      name : "network"
-      prefix : name + "/"
-      files : [
-         "multi_thread_server.cpp",
-         "multi_thread_server.h"	
-      ]
-   }
+   files: [
+       "global_defs.h",
+       "macros.h",
+       "service_repo.h"
+   ]
 }
