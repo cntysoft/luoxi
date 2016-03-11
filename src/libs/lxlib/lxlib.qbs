@@ -26,7 +26,7 @@ Product
    }
    cpp.visibility: "minimal"
    cpp.cxxLanguageVersion: "c++14"
-   cpp.includePaths:[".","../lxlib/", "../"]
+   cpp.includePaths:[".", "../"]
    Export {
       Depends { name: "cpp" }
       Depends { name: "Qt"; submodules: ["core"] }
@@ -46,6 +46,14 @@ Product
            "common_funcs.h",
            "const.h",
            "global.h",
+       ]
+   }
+   Group {
+      name : "kernel"
+      prefix : name + "/"
+      files : [
+           "stddir.cpp",
+           "stddir.h",
        ]
    }
    Group {

@@ -9,6 +9,9 @@ LuoxiApplication
          "websockets"
       ]
    }
+   Depends { name: "corelib"}
+   Depends { name: "lxlib"}
+   Depends { name: "lxservicelib"}
    cpp.includePaths: base.concat([
                                     ".","../../libs"
                                  ])

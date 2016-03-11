@@ -6,7 +6,7 @@ Product {
       submodules: ["core", "network"]
    }
    Depends {name:"cpp"}
-   Depends { name: "lxlib"}
+//   Depends { name: "lxlib"}
    Depends { name: "corelib"}
    consoleApplication: true
    destinationDirectory: "bin"

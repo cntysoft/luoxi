@@ -1,5 +1,5 @@
-#ifndef UMS_LIB_NETWORK_MULTI_THREAD_SERVER_H
-#define UMS_LIB_NETWORK_MULTI_THREAD_SERVER_H
+#ifndef LUOXI_LIB_NETWORK_MULTI_THREAD_SERVER_H
+#define LUOXI_LIB_NETWORK_MULTI_THREAD_SERVER_H
 
 #include <QMap>
 #include <QByteArray>
@@ -45,6 +45,6 @@ LUOXI_LIB_EXPORT MultiThreadServer*& get_global_server();
 LUOXI_LIB_EXPORT void set_global_server(MultiThreadServer* server);
 
 }//network
-}//umslib
+}//lxlib
 
-#endif // UMS_LIB_NETWORK_MULTI_THREAD_SERVER_H
+#endif // LUOXI_LIB_NETWORK_MULTI_THREAD_SERVER_H
