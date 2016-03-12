@@ -67,7 +67,7 @@ public:
    Q_INVOKABLE ServiceInvokeResponse deploy(const ServiceInvokeRequest &request);
 protected:
    void downloadUpgradePkg(const QString &filename);
-   //   void clearState();
+   void clearState();
    QString getDeployTmpDir();
    void unzipPkg(const QString &pkgFilename);
    void copyFilesToDeployDir();

@@ -4,6 +4,7 @@
 #include <QSqlQuery>
 #include <QProcessEnvironment>
 #include <QVariant>
+#include <QThread>
 
 #include "corelib/kernel/settings.h"
 #include "corelib/kernel/application.h"
@@ -91,36 +92,23 @@ ServiceInvokeResponse InstanceDeployWrapper::deploy(const ServiceInvokeRequest &
    //      //下载升级文件到本地
    //      downloadUpgradePkg(baseFilename);
    //   }
-//   downloadUpgradePkg(baseFilename);
-//   if(!m_context->deployStatus){
-//      goto process_error;
-//   }
-//   unzipPkg(m_context->pkgFilename);
-//   if(!m_context->deployStatus){
-//      goto process_error;
-//   }
-//   copyFilesToDeployDir();
-//   createDatabase();
-//   if(!m_context->deployStatus){
-//      goto process_error;
-//   }
-   addDomainRecord();
-   //   runUpgradeScript();
-   //   if(!m_context->upgradeStatus){
-   //      response.setDataItem("msg", m_context->upgradeErrorString);
-   //      writeInterResponse(request, response);
-   //      response.setStatus(false);
-   //      response.setDataItem("step", STEP_ERROR);
-   //      response.setError({-1, "升级失败"});
-   //      clearState();
-   //      return response;
+   //   downloadUpgradePkg(baseFilename);
+   //   if(!m_context->deployStatus){
+   //      goto process_error;
    //   }
-   //   upgradeComplete();
-   //   response.setSerial(request.getSerial());
-   //   response.setIsFinal(true);
-   //   response.setStatus(true);
-   //   response.setDataItem("msg", "升级完成");
-   //   response.setDataItem("step", STEP_FINISH);
+   //   unzipPkg(m_context->pkgFilename);
+   //   if(!m_context->deployStatus){
+   //      goto process_error;
+   //   }
+   //   copyFilesToDeployDir();
+   //   createDatabase();
+   //   if(!m_context->deployStatus){
+   //      goto process_error;
+   //   }
+   addDomainRecord();
+   if(!m_context->deployStatus){
+      goto process_error;
+   }
 process_success:
    response.setStatus(true);
    response.setDataItem("msg", "升级完成");
@@ -132,7 +120,7 @@ process_error:
    response.setStatus(false);
    response.setDataItem("step", STEP_ERROR);
    response.setError({-1, "创建站点失败"});
-   //      clearState();
+   clearState();
    return response;
 }
 
@@ -143,15 +131,15 @@ void InstanceDeployWrapper::addDomainRecord()
    m_context->response.setDataItem("msg", "正在解析站点域名数据");
    writeInterResponse(m_context->request, m_context->response);
    QSharedPointer<DnsResolve> resolver = getDnsResolver();
-   
    resolver->addDomainRecord(KELESHOP_DOMAIN, QString(INSTANCE_SUBDOMAIN_TPL).arg(m_context->instanceKey, KELESHOP_DOMAIN),
-                             DnsResolve::A, m_deployServerAddress, [=](QMap<QString, QVariant> response){
-      qDebug() << response;
-      m_eventLoop.exit();
+                             DnsResolve::A, m_deployServerAddress, [&](QMap<QString, QVariant> response){
+      if(response.contains("Code")){
+         m_context->deployStatus = false;
+         m_context->deployErrorString = response.value("Message").toString();
+      }
    });
-   m_eventLoop.exec();
-   
 }
+
 
 QSharedPointer<DnsResolve> InstanceDeployWrapper::getDnsResolver()
 {
@@ -273,6 +261,20 @@ QSharedPointer<DownloadClient> InstanceDeployWrapper::getDownloadClient(const QS
    }
    return m_downloadClient;
 }
+
+void InstanceDeployWrapper::clearState()
+{
+   m_context.clear();
+   m_step = STEP_PREPARE;
+   if(!m_downloadClient.isNull()){
+      m_downloadClient->clearState();
+   }
+   //清除残余文件
+   if(!m_serviceInvoker.isNull()){
+      m_serviceInvoker->disconnectFromServer();
+   }
+}
+
 
 }//kelecloud
 }//lxservice
