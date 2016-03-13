@@ -50,10 +50,11 @@ public:
    const static int STEP_COPY_FILES = 4;
    const static int STEP_CREATE_DB = 5;
    const static int STEP_ADD_DOMAIN_RECORD = 6;
-   const static int STEP_RESTART_SERVER = 7;
-   const static int STEP_CLEANUP = 8;
-   const static int STEP_FINISH = 9;
-   const static int STEP_ERROR = 10;
+   const static int STEP_NGINX_CFG = 7;
+   const static int STEP_RESTART_SERVER = 8;
+   const static int STEP_CLEANUP = 9;
+   const static int STEP_FINISH = 10;
+   const static int STEP_ERROR = 11;
    
    const static QString KELESHOP_PKG_NAME_TPL;
    const static QString DEPLOY_DIR_TPL;
@@ -73,6 +74,9 @@ protected:
    void copyFilesToDeployDir();
    void createDatabase();
    void addDomainRecord();
+   void setupNginxCfg();
+   void restartNginx();
+   void cleanupTmpFiles();
 protected:
    QSharedPointer<DownloadClient> getDownloadClient(const QString &host, quint16 port);
    QSharedPointer<DnsResolve> getDnsResolver();

@@ -18,5 +18,6 @@ Project
    }
    references : [
       "src/src.qbs",
+      "share/share.qbs"
    ]
 }

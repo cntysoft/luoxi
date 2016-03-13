@@ -5,6 +5,7 @@
 #include <QProcessEnvironment>
 #include <QVariant>
 #include <QThread>
+#include <QByteArray>
 
 #include "corelib/kernel/settings.h"
 #include "corelib/kernel/application.h"
@@ -14,7 +15,7 @@
 #include "corelib/cloud/aliyun/dns/dns_resolve.h"
 #include "lxlib/global/const.h"
 #include "lxlib/kernel/stddir.h"
-
+#include "corelib/kernel/stddir.h"
 
 #include <QDebug>
 
@@ -68,7 +69,6 @@ ServiceInvokeResponse InstanceDeployWrapper::deploy(const ServiceInvokeRequest &
    m_context->deployStatus = true;
    m_context->currentVersion = args.value("currentVersion").toString();
    m_context->instanceKey = args.value("instanceKey").toString();
-   
    QString baseFilename = QString(KELESHOP_PKG_NAME_TPL).arg(m_context->currentVersion);
    QString upgradePkgFilename = softwareRepoDir + '/' + baseFilename;
    m_context->pkgFilename = upgradePkgFilename;
@@ -83,35 +83,42 @@ ServiceInvokeResponse InstanceDeployWrapper::deploy(const ServiceInvokeRequest &
       response.setStatus(false);
       response.setDataItem("step", STEP_ERROR);
       response.setError({-1, "站点部署文件夹或者nginx配置文件已经存在"});
-      //      clearState();
+      clearState();
       return response;
    }
    m_context->deployDir = targetDeployDir;
    m_context->nginxCfgFilename = nginxCfgFilename;
-   //   if(!Filesystem::fileExist(upgradePkgFilename)){
-   //      //下载升级文件到本地
-   //      downloadUpgradePkg(baseFilename);
-   //   }
-   //   downloadUpgradePkg(baseFilename);
-   //   if(!m_context->deployStatus){
-   //      goto process_error;
-   //   }
-   //   unzipPkg(m_context->pkgFilename);
-   //   if(!m_context->deployStatus){
-   //      goto process_error;
-   //   }
-   //   copyFilesToDeployDir();
-   //   createDatabase();
-   //   if(!m_context->deployStatus){
-   //      goto process_error;
-   //   }
+   if(!Filesystem::fileExist(upgradePkgFilename)){
+      //下载升级文件到本地
+      downloadUpgradePkg(baseFilename);
+   }
+   if(!m_context->deployStatus){
+      goto process_error;
+   }
+   unzipPkg(m_context->pkgFilename);
+   if(!m_context->deployStatus){
+      goto process_error;
+   }
+   copyFilesToDeployDir();
+   createDatabase();
+   if(!m_context->deployStatus){
+      goto process_error;
+   }
    addDomainRecord();
    if(!m_context->deployStatus){
       goto process_error;
    }
-process_success:
+   setupNginxCfg();
+   if(!m_context->deployStatus){
+      goto process_error;
+   }
+   restartNginx();
+   if(!m_context->deployStatus){
+      goto process_error;
+   }
+   m_step = STEP_FINISH;
    response.setStatus(true);
-   response.setDataItem("msg", "升级完成");
+   response.setDataItem("msg", "创建站点完成");
    response.setDataItem("step", STEP_FINISH);
    return response;
 process_error:
@@ -124,33 +131,36 @@ process_error:
    return response;
 }
 
-void InstanceDeployWrapper::addDomainRecord()
+void InstanceDeployWrapper::downloadUpgradePkg(const QString &filename)
 {
-   m_step = STEP_ADD_DOMAIN_RECORD;
-   m_context->response.setDataItem("step", STEP_ADD_DOMAIN_RECORD);
-   m_context->response.setDataItem("msg", "正在解析站点域名数据");
-   writeInterResponse(m_context->request, m_context->response);
-   QSharedPointer<DnsResolve> resolver = getDnsResolver();
-   resolver->addDomainRecord(KELESHOP_DOMAIN, QString(INSTANCE_SUBDOMAIN_TPL).arg(m_context->instanceKey, KELESHOP_DOMAIN),
-                             DnsResolve::A, m_deployServerAddress, [&](QMap<QString, QVariant> response){
-      if(response.contains("Code")){
-         m_context->deployStatus = false;
-         m_context->deployErrorString = response.value("Message").toString();
-      }
-   });
+   //获取相关的配置信息
+   Settings& settings = Application::instance()->getSettings();
+   QSharedPointer<DownloadClient> downloader = getDownloadClient(settings.getValue("metaserverHost").toString(), 
+                                                                 settings.getValue("metaserverPort").toInt());
+   downloader->download(filename);
+   m_eventLoop.exec();
 }
 
-
-QSharedPointer<DnsResolve> InstanceDeployWrapper::getDnsResolver()
+void InstanceDeployWrapper::unzipPkg(const QString &pkgFilename)
 {
-   if(m_dnsResolver.isNull()){
-      Settings& settings = Application::instance()->getSettings();
-      QString accessKeyId = settings.getValue("aliAccessKeyId", LUOXI_CFG_GROUP_GLOBAL, "twJjKngFf6uySA0P").toString();
-      QString accessKeySecret = settings.getValue("aliAccessKeySecret", LUOXI_CFG_GROUP_GLOBAL, "3edbGFcrayDU4kaDrS004sp5J5Auod").toString();
-      QSharedPointer<DnsApiCaller> caller(new DnsApiCaller(accessKeyId, accessKeySecret));
-      m_dnsResolver.reset(new DnsResolve(caller));
+   m_context->response.setDataItem("step", STEP_EXTRA_PKG);
+   m_context->response.setDataItem("msg", "正在解压升级压缩包");
+   m_context->response.setStatus(true);
+   writeInterResponse(m_context->request, m_context->response);
+   QString targetExtraDir(getDeployTmpDir());
+   if(!Filesystem::dirExist(targetExtraDir)){
+      Filesystem::createPath(targetExtraDir);
    }
-   return m_dnsResolver;
+   QProcess process;
+   QStringList args;
+   process.setWorkingDirectory(targetExtraDir);
+   args << "-zxvf" << pkgFilename;
+   process.start("tar", args);
+   bool status = process.waitForFinished(-1);
+   if(!status || process.exitCode() != 0){
+      m_context->deployStatus = false;
+      m_context->deployErrorString = process.errorString();
+   }
 }
 
 void InstanceDeployWrapper::copyFilesToDeployDir()
@@ -197,36 +207,67 @@ void InstanceDeployWrapper::createDatabase()
    }
 }
 
-void InstanceDeployWrapper::downloadUpgradePkg(const QString &filename)
+void InstanceDeployWrapper::addDomainRecord()
 {
-   //获取相关的配置信息
-   Settings& settings = Application::instance()->getSettings();
-   QSharedPointer<DownloadClient> downloader = getDownloadClient(settings.getValue("metaserverHost").toString(), 
-                                                                 settings.getValue("metaserverPort").toInt());
-   downloader->download(filename);
-   m_eventLoop.exec();
+   m_step = STEP_ADD_DOMAIN_RECORD;
+   m_context->response.setDataItem("step", STEP_ADD_DOMAIN_RECORD);
+   m_context->response.setDataItem("msg", "正在解析站点域名数据");
+   writeInterResponse(m_context->request, m_context->response);
+   QSharedPointer<DnsResolve> resolver = getDnsResolver();
+   resolver->addDomainRecord(KELESHOP_DOMAIN, QString(INSTANCE_SUBDOMAIN_TPL).arg(m_context->instanceKey, KELESHOP_DOMAIN),
+                             DnsResolve::A, m_deployServerAddress, [&](QMap<QString, QVariant> response){
+      if(response.contains("Code")){
+         //暂时不算错误
+//         m_context->deployStatus = false;
+//         m_context->deployErrorString = response.value("Message").toString();
+      }
+   });
 }
 
-void InstanceDeployWrapper::unzipPkg(const QString &pkgFilename)
+void InstanceDeployWrapper::setupNginxCfg()
 {
-   m_context->response.setDataItem("step", STEP_EXTRA_PKG);
-   m_context->response.setDataItem("msg", "正在解压升级压缩包");
-   m_context->response.setStatus(true);
+   m_step = STEP_NGINX_CFG;
+   m_context->response.setDataItem("step", STEP_NGINX_CFG);
+   m_context->response.setDataItem("msg", "正在设置nginx配置文件");
    writeInterResponse(m_context->request, m_context->response);
-   QString targetExtraDir(getDeployTmpDir());
-   if(!Filesystem::dirExist(targetExtraDir)){
-      Filesystem::createPath(targetExtraDir);
+   QString tplFilename = StdDir::getShareResDir()+"/conf/nginx_conf.tpl";
+   QByteArray confTpl = Filesystem::fileGetContents(tplFilename);
+   confTpl.replace("{domain}", QString(INSTANCE_SUBDOMAIN_TPL).arg(m_context->instanceKey, KELESHOP_DOMAIN).toLocal8Bit())
+         .replace("{instanceKey}", m_context->instanceKey.toLocal8Bit())
+         .replace("{deployDir}", m_context->deployDir.toLocal8Bit());
+   if(-1 == Filesystem::filePutContents(m_context->nginxCfgFilename, confTpl)){
+      m_context->deployStatus = false;
+      m_context->deployErrorString = Filesystem::getErrorString();
    }
+}
+
+void InstanceDeployWrapper::restartNginx()
+{
+   m_step = STEP_RESTART_SERVER;
+   m_context->response.setDataItem("step", STEP_RESTART_SERVER);
+   m_context->response.setDataItem("msg", "重启nginx服务器");
+   writeInterResponse(m_context->request, m_context->response);
    QProcess process;
    QStringList args;
-   process.setWorkingDirectory(targetExtraDir);
-   args << "-zxvf" << pkgFilename;
-   process.start("tar", args);
+   args << "-s" << "reload";
+   process.start("nginx", args);
    bool status = process.waitForFinished(-1);
    if(!status || process.exitCode() != 0){
       m_context->deployStatus = false;
       m_context->deployErrorString = process.errorString();
    }
+}
+
+QSharedPointer<DnsResolve> InstanceDeployWrapper::getDnsResolver()
+{
+   if(m_dnsResolver.isNull()){
+      Settings& settings = Application::instance()->getSettings();
+      QString accessKeyId = settings.getValue("aliAccessKeyId", LUOXI_CFG_GROUP_GLOBAL, "twJjKngFf6uySA0P").toString();
+      QString accessKeySecret = settings.getValue("aliAccessKeySecret", LUOXI_CFG_GROUP_GLOBAL, "3edbGFcrayDU4kaDrS004sp5J5Auod").toString();
+      QSharedPointer<DnsApiCaller> caller(new DnsApiCaller(accessKeyId, accessKeySecret));
+      m_dnsResolver.reset(new DnsResolve(caller));
+   }
+   return m_dnsResolver;
 }
 
 QString InstanceDeployWrapper::getDeployTmpDir()
@@ -260,6 +301,17 @@ QSharedPointer<DownloadClient> InstanceDeployWrapper::getDownloadClient(const QS
       });
    }
    return m_downloadClient;
+}
+
+void InstanceDeployWrapper::cleanupTmpFiles()
+{
+   m_step = STEP_CLEANUP;
+   m_context->response.setDataItem("step", STEP_CLEANUP);
+   m_context->response.setDataItem("msg", "正在删除临时文件");
+   writeInterResponse(m_context->request, m_context->response);
+   if(Filesystem::dirExist(getDeployTmpDir())){
+      Filesystem::deleteDir(getDeployTmpDir());
+   }
 }
 
 void InstanceDeployWrapper::clearState()
