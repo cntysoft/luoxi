@@ -18,6 +18,7 @@ using sn::corelib::AbstractCommandRunner;
 using luoxi::command::GlobalVersionCommand;
 using luoxi::command::GlobalHelpCommand;
 using luoxi::command::StartServerCommand;
+using luoxi::command::GlobalPidFilenameCommand;
 
 CommandRunner::CommandRunner(Application &app)
    : AbstractCommandRunner(app)
@@ -27,6 +28,7 @@ CommandRunner::CommandRunner(Application &app)
    addUsageText("--version  print luoxi system version number\n");
    addUsageText("--help     print help document\n");
    addUsageText("start [--daemon] [--port] start luoxi server\n");
+   addUsageText("pidfilename get application pid filename\n\n");
    initCommandPool();
    initRouteItems();
 }
@@ -45,6 +47,10 @@ void CommandRunner::initCommandPool()
       StartServerCommand *cmd = new StartServerCommand(dynamic_cast<CommandRunner&>(runner), meta);
       return cmd;
    });
+   m_cmdRegisterPool.insert("Global_PidFilename", [](AbstractCommandRunner& runner, const CommandMeta& meta)->AbstractCommand*{
+      GlobalPidFilenameCommand* cmd = new GlobalPidFilenameCommand(dynamic_cast<CommandRunner&>(runner), meta);
+      return cmd;
+   });
 }
 
 void CommandRunner::initRouteItems()
@@ -60,6 +66,10 @@ void CommandRunner::initRouteItems()
    addCmdRoute("startserver", "start [--daemon] [--port]", 1, {
                   {"category", "Global"},
                   {"name", "StartServer"}
+               });
+   addCmdRoute("pidfilename", "pidfilename", 1, {
+                  {"category", "Global"},
+                  {"name", "PidFilename"}
                });
 }
 

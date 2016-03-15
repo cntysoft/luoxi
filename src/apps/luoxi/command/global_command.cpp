@@ -1,9 +1,14 @@
 #include "global_command.h"
+#include "corelib/kernel/application.h"
+#include "corelib/io/terminal.h"
+
+#include <iostream>
 
 namespace luoxi{
 namespace command{
 
 using sn::corelib::TerminalColor;
+using sn::corelib::Application;
 
 GlobalHelpCommand::GlobalHelpCommand(AbstractCommandRunner& runner, const CommandMeta& invokeMeta)
    : AbstractCommand(runner, invokeMeta)
@@ -33,6 +38,21 @@ void GlobalVersionCommand::exec()
 }
 
 GlobalVersionCommand::~GlobalVersionCommand()
+{}
+
+
+GlobalPidFilenameCommand::GlobalPidFilenameCommand(AbstractCommandRunner& runner, const CommandMeta& invokeMeta)
+   : AbstractCommand(runner, invokeMeta)
+{
+}
+
+void GlobalPidFilenameCommand::exec()
+{
+   std::cout << Application::instance()->getPidFilename().toStdString();
+   exit(EXIT_SUCCESS);
+}
+
+GlobalPidFilenameCommand::~GlobalPidFilenameCommand()
 {}
 
 }//command
