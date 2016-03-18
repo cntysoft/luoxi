@@ -21,8 +21,8 @@ static void init_global_cfg(Settings& settings)
    settings.setValue("baseDataDir", "/cntysoft/luoxi", LUOXI_CFG_GROUP_GLOBAL);
    settings.setValue("deployBaseDir", "/srv/www", LUOXI_CFG_GROUP_GLOBAL);
    settings.setValue("nginxConfDir", "/etc/nginx/vhost", LUOXI_CFG_GROUP_GLOBAL);
-   settings.setValue("keleshopDeployUserId", 30, LUOXI_CFG_GROUP_GLOBAL);
-   settings.setValue("keleshopDeployGroupId", 8, LUOXI_CFG_GROUP_GLOBAL);
+   settings.setValue("webDeployUserId", 30, LUOXI_CFG_GROUP_GLOBAL);
+   settings.setValue("webDeployGroupId", 8, LUOXI_CFG_GROUP_GLOBAL);
    settings.setValue("dbHost", "localhost", LUOXI_CFG_GROUP_GLOBAL);
    settings.setValue("dbUser", "root", LUOXI_CFG_GROUP_GLOBAL);
    settings.setValue("dbPassword", "cntysoft", LUOXI_CFG_GROUP_GLOBAL);

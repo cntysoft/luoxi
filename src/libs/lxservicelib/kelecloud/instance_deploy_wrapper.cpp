@@ -4,7 +4,6 @@
 #include <QSqlQuery>
 #include <QProcessEnvironment>
 #include <QVariant>
-#include <QThread>
 #include <QByteArray>
 
 #include "corelib/kernel/settings.h"
@@ -43,8 +42,8 @@ InstanceDeployWrapper::InstanceDeployWrapper(ServiceProvider& provider)
    Settings& settings = Application::instance()->getSettings();
    m_deployBaseDir = settings.getValue("deployBaseDir", LUOXI_CFG_GROUP_GLOBAL, "/srv/www").toString();
    m_nginxConfDir = settings.getValue("nginxConfDir", LUOXI_CFG_GROUP_GLOBAL, "/etc/nginx/vhost").toString();
-   m_userId = settings.getValue("keleshopDeployUserId", LUOXI_CFG_GROUP_GLOBAL, 30).toInt();
-   m_groupId = settings.getValue("keleshopDeployGroupId", LUOXI_CFG_GROUP_GLOBAL, 8).toInt();
+   m_userId = settings.getValue("webshopDeployUserId", LUOXI_CFG_GROUP_GLOBAL, 30).toInt();
+   m_groupId = settings.getValue("webDeployGroupId", LUOXI_CFG_GROUP_GLOBAL, 8).toInt();
    m_dbHost = settings.getValue("dbHost", LUOXI_CFG_GROUP_GLOBAL).toString();
    m_dbUser = settings.getValue("dbUser", LUOXI_CFG_GROUP_GLOBAL).toString();
    m_dbPassword = settings.getValue("dbPassword", LUOXI_CFG_GROUP_GLOBAL).toString();

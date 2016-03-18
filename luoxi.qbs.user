@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 3.5.81, 2016-03-16T11:43:23. -->
+<!-- Written by QtCreator 3.5.81, 2016-03-18T19:22:48. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
@@ -215,7 +215,7 @@
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">luoxi</value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">Qbs.RunConfiguration:luoxi.qtc_Desktop_2b01bf22---Qbs.RC.NameSeparator---luoxi</value>
-    <value type="QString" key="Qbs.RunConfiguration.CommandLineArguments">deploysystem luoxi rpmbuild --version=0.0.1</value>
+    <value type="QString" key="Qbs.RunConfiguration.CommandLineArguments">start</value>
     <value type="QString" key="Qbs.RunConfiguration.WorkingDirectory"></value>
     <value type="QString" key="Qbs.RunConfiguration.WorkingDirectory.default">/cntysoft/company/projects/cplusplus/build-luoxi-Desktop-Debug/qtc_Desktop_2b01bf22-debug/install-root/bin</value>
     <value type="uint" key="RunConfiguration.QmlDebugServerPort">3768</value>

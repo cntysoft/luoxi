@@ -11,17 +11,11 @@ using sn::corelib::network::AbstractService;
 void init_service_provider()
 {
    ServiceProvider& provider = ServiceProvider::instance();
-//   provider.addServiceToPool("Upgrader/UpgradeCloudController", [](ServiceProvider& provider)-> AbstractService*{
-//      return new umsservice::upgrader::UpgradeCloudControllerWrapper(provider);
-//   });
-//   //   provider.addServiceToPool("ServerStatus/Info", [](ServiceProvider& provider)-> AbstractService*{
-//   //                            return new ummservice::serverstatus::Info(provider);
-//   //                         });
-//   //   provider.addServiceToPool("Common/Uploader", [](ServiceProvider& provider)-> AbstractService*{
-//   //                            return new ummservice::common::Uploader(provider);
-//   //                         });
    provider.addServiceToPool("KeleCloud/InstanceDeploy", [](ServiceProvider& provider)-> AbstractService*{
       return new lxservice::kelecloud::InstanceDeployWrapper(provider);
+   });
+   provider.addServiceToPool("ZhuChao/NewDeploy", [](ServiceProvider& provider)-> AbstractService*{
+      return new lxservice::zhuchao::NewDeployWrapper(provider);
    });
 }
 
