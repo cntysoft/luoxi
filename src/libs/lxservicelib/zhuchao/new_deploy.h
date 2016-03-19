@@ -27,6 +27,7 @@ public:
    struct NewDeployContext
    {
       QString targetVersion;
+      bool withoutDb;
       QString pkgFilename;
       ServiceInvokeRequest request;
       ServiceInvokeResponse response;

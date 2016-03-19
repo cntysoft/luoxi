@@ -54,74 +54,56 @@ ServiceInvokeResponse NewDeployWrapper::deploy(const ServiceInvokeRequest &reque
    if(m_step != STEP_PREPARE){
       throw_exception(ErrorInfo("状态错误"), getErrorContext());
    }
-//   m_step = STEP_INIT_CONTEXT;
-//   m_context.reset(new InstanceDeployContext);
-//   QMap<QString, QVariant> args = request.getArgs();
-//   checkRequireFields(args, {"currentVersion", "instanceKey"});
-//   QString softwareRepoDir = StdDir::getSoftwareRepoDir();
-//   m_context->deployStatus = true;
-//   m_context->currentVersion = args.value("currentVersion").toString();
-//   m_context->instanceKey = args.value("instanceKey").toString();
-//   QString baseFilename = QString(KELESHOP_PKG_NAME_TPL).arg(m_context->currentVersion);
-//   QString upgradePkgFilename = softwareRepoDir + '/' + baseFilename;
-//   m_context->pkgFilename = upgradePkgFilename;
-//   m_context->request = request;
-//   ServiceInvokeResponse response("KeleCloud/InstanceDeploy/deploy", true);
-//   response.setSerial(request.getSerial());
-//   m_context->response = response;
-//   //检查站点目录是否存在
-//   QString targetDeployDir = m_deployBaseDir+'/' + QString(DEPLOY_DIR_TPL).arg(m_context->instanceKey);
-//   QString nginxCfgFilename = m_nginxConfDir+'/'+QString(NGINX_CFG_FILENAME_TPL).arg(m_context->instanceKey);
-//   if(Filesystem::fileExist(nginxCfgFilename) || Filesystem::dirExist(targetDeployDir)){
-//      response.setStatus(false);
-//      response.setDataItem("step", STEP_ERROR);
-//      response.setError({-1, "站点部署文件夹或者nginx配置文件已经存在"});
-//      clearState();
-//      return response;
-//   }
-//   m_context->deployDir = targetDeployDir;
-//   m_context->nginxCfgFilename = nginxCfgFilename;
-//   if(!Filesystem::fileExist(upgradePkgFilename)){
-//      //下载升级文件到本地
-//      downloadUpgradePkg(baseFilename);
-//   }
-//   if(!m_context->deployStatus){
-//      goto process_error;
-//   }
-//   unzipPkg(m_context->pkgFilename);
-//   if(!m_context->deployStatus){
-//      goto process_error;
-//   }
-//   copyFilesToDeployDir();
-//   createDatabase();
-//   if(!m_context->deployStatus){
-//      goto process_error;
-//   }
-//   addDomainRecord();
-//   if(!m_context->deployStatus){
-//      goto process_error;
-//   }
-//   setupNginxCfg();
-//   if(!m_context->deployStatus){
-//      goto process_error;
-//   }
-//   restartNginx();
-//   if(!m_context->deployStatus){
-//      goto process_error;
-//   }
-//   m_step = STEP_FINISH;
-//   response.setStatus(true);
-//   response.setDataItem("msg", "筑巢部署完成");
-//   response.setDataItem("step", STEP_FINISH);
-//   return response;
-//process_error:
-//   response.setDataItem("msg", m_context->deployErrorString);
-//   writeInterResponse(request, response);
-//   response.setStatus(false);
-//   response.setDataItem("step", STEP_ERROR);
-//   response.setError({-1, "筑巢部署失败"});
-//   clearState();
-//   return response;
+   m_step = STEP_INIT_CONTEXT;
+   m_context.reset(new NewDeployContext);
+   QMap<QString, QVariant> args = request.getArgs();
+   checkRequireFields(args, {"targetVersion", "withoutDb"});
+   QString softwareRepoDir = StdDir::getSoftwareRepoDir();
+   m_context->deployStatus = true;
+   m_context->targetVersion = args.value("targetVersion").toString();
+   m_context->withoutDb = args.value("withoutDb").toBool();
+   QString baseFilename = QString(ZHUCHAO_PKG_NAME_TPL).arg(m_context->targetVersion);
+   QString upgradePkgFilename = softwareRepoDir + '/' + baseFilename;
+   m_context->pkgFilename = upgradePkgFilename;
+   m_context->request = request;
+   ServiceInvokeResponse response("ZhuChao/NewDeploy/deploy", true);
+   response.setSerial(request.getSerial());
+   m_context->response = response;
+   //检查站点目录是否存在
+   QString targetDeployDir = m_deployBaseDir+'/' + DEPLOY_DIR_TPL;
+   m_context->deployDir = targetDeployDir;
+   //下载升级文件到本地, 每次都强行下载
+   downloadZhuChaoPkg(baseFilename);
+   if(!m_context->deployStatus){
+      goto process_error;
+   }
+   unzipPkg(m_context->pkgFilename);
+   if(!m_context->deployStatus){
+      goto process_error;
+   }
+   copyFilesToDeployDir();
+   if(!m_context->deployStatus){
+      goto process_error;
+   }
+   if(!m_context->withoutDb){
+      createDatabase();
+      if(!m_context->deployStatus){
+         goto process_error;
+      }
+   }
+   m_step = STEP_FINISH;
+   response.setStatus(true);
+   response.setDataItem("msg", "筑巢部署完成");
+   response.setDataItem("step", STEP_FINISH);
+   return response;
+process_error:
+   response.setDataItem("msg", m_context->deployErrorString);
+   writeInterResponse(request, response);
+   response.setStatus(false);
+   response.setDataItem("step", STEP_ERROR);
+   response.setError({-1, "筑巢部署失败"});
+   clearState();
+   return response;
 }
 
 void NewDeployWrapper::downloadZhuChaoPkg(const QString &filename)
@@ -165,39 +147,38 @@ void NewDeployWrapper::copyFilesToDeployDir()
    Filesystem::createPath(m_context->deployDir);
    QString sourceDir = ZHUCHAO_PKG_NAME_TPL.mid(0, ZHUCHAO_PKG_NAME_TPL.size() - 7);
    sourceDir = getDeployTmpDir() + '/'+sourceDir.arg(m_context->targetVersion);
-   Filesystem::copyDir(sourceDir, m_context->deployDir, true);
+   if(Filesystem::dirExist(m_context->deployDir)){
+      Filesystem::deleteDirRecusive(m_context->deployDir);
+   }
+   if(!Filesystem::copyDir(sourceDir, m_context->deployDir, true)){
+      m_context->deployErrorString = Filesystem::getErrorString();
+      m_context->deployStatus = false;
+   }
 }
 
 void NewDeployWrapper::createDatabase()
 {
-//   m_step = STEP_CREATE_DB;
-//   m_context->response.setDataItem("step", STEP_CREATE_DB);
-//   m_context->response.setDataItem("msg", "正在创建站点数据库");
-//   writeInterResponse(m_context->request, m_context->response);
-//   QString dbname = DB_NAME_TPL;
-//   QSharedPointer<QSqlQuery> query = m_sqlEngine->query(QString("select count(TABLE_NAME) from INFORMATION_SCHEMA.TABLES where TABLE_SCHEMA='%1'")
-//                                                        .arg(dbname));
-//   if(query->next() && query->value(0).toInt() > 0){
-//      m_context->deployStatus = false;
-//      m_context->deployErrorString = QString("站点数据库 %1 已经存在").arg(dbname);
-//      return;
-//   }
-//   try{
-//      m_sqlEngine->query(QString("CREATE DATABASE `%1`").arg(dbname));
-//   }catch(ErrorInfo error){
-//      m_context->deployStatus = false;
-//      m_context->deployErrorString = error.toString();
-//   }
-//   QProcessEnvironment env(QProcessEnvironment::systemEnvironment());
-//   QString ldLibraryPath(env.value("LD_LIBRARY_PATH"));
-//   ldLibraryPath = "/usr/lib64:"+ldLibraryPath;
-//   ::setenv("LD_LIBRARY_PATH", ldLibraryPath.toLocal8Bit(), 1);
-//   QString cmd = QString("mysql -u%1 -p%2 %3 < %4").arg(m_dbUser, m_dbPassword, dbname, m_context->deployDir+'/'+QString(DB_SQL_FILENAME_TPL).arg(m_context->currentVersion));
-//   int exitCode = std::system(cmd.toLocal8Bit());
-//   if(0 != exitCode){
-//      m_context->deployStatus = false;
-//      m_context->deployErrorString = QString("创建数据库 %1 失败").arg(dbname);
-//   }
+   m_step = STEP_CREATE_DB;
+   m_context->response.setDataItem("step", STEP_CREATE_DB);
+   m_context->response.setDataItem("msg", "正在创建站点数据库");
+   writeInterResponse(m_context->request, m_context->response);
+   try{
+      m_sqlEngine->query(QString("DROP DATABASE IF EXISTS `%1`").arg(DB_NAME_TPL));
+      m_sqlEngine->query(QString("CREATE DATABASE `%1`").arg(DB_NAME_TPL));
+   }catch(ErrorInfo error){
+      m_context->deployStatus = false;
+      m_context->deployErrorString = error.toString();
+   }
+   QProcessEnvironment env(QProcessEnvironment::systemEnvironment());
+   QString ldLibraryPath(env.value("LD_LIBRARY_PATH"));
+   ldLibraryPath = "/usr/lib64:"+ldLibraryPath;
+   ::setenv("LD_LIBRARY_PATH", ldLibraryPath.toLocal8Bit(), 1);
+   QString cmd = QString("mysql -u%1 -p%2 %3 < %4").arg(m_dbUser, m_dbPassword, DB_NAME_TPL, m_context->deployDir+'/'+QString(DB_SQL_FILENAME_TPL).arg(m_context->targetVersion));
+   int exitCode = std::system(cmd.toLocal8Bit());
+   if(0 != exitCode){
+      m_context->deployStatus = false;
+      m_context->deployErrorString = QString("创建数据库 %1 失败").arg(DB_NAME_TPL);
+   }
 }
 
 
