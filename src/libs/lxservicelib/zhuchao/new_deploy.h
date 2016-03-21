@@ -46,7 +46,8 @@ public:
    const static int STEP_CREATE_DB = 6;
    const static int STEP_CLEANUP = 7;
    const static int STEP_FINISH = 8;
-   const static int STEP_ERROR = 9;
+   const static int STEP_SETUP_PERM = 9;
+   const static int STEP_ERROR = 10;
    
    const static QString ZHUCHAO_PKG_NAME_TPL;
    const static QString DEPLOY_DIR_TPL;
@@ -63,6 +64,7 @@ protected:
    void copyFilesToDeployDir();
    void processInfo();
    void createDatabase();
+   void setPermissions();
    void cleanupTmpFiles();
 protected:
    QSharedPointer<DownloadClientWrapper> getDownloadClient(const QString &host, quint16 port);

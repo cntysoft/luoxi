@@ -101,6 +101,7 @@ ServiceInvokeResponse NewDeployWrapper::deploy(const ServiceInvokeRequest &reque
          goto process_error;
       }
    }
+   setPermissions();
    m_step = STEP_FINISH;
    response.setStatus(true);
    response.setDataItem("msg", "筑巢部署完成");
@@ -216,6 +217,17 @@ void NewDeployWrapper::createDatabase()
    }
 }
 
+void NewDeployWrapper::setPermissions()
+{
+   m_step = STEP_SETUP_PERM;
+   m_context->response.setDataItem("step", STEP_SETUP_PERM);
+   m_context->response.setDataItem("msg", "设置站点文件权限");
+   writeInterResponse(m_context->request, m_context->response);
+   //设置权限
+   Filesystem::traverseFs(m_context->deployDir, 0, [&](QFileInfo &fileinfo, int){
+      Filesystem::chown(fileinfo.absoluteFilePath(), m_userId, m_groupId);
+   });
+}
 
 QString NewDeployWrapper::getDeployTmpDir()
 {
