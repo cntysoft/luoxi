@@ -5,6 +5,11 @@
 #include <QProcessEnvironment>
 #include <QVariant>
 #include <QByteArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QJsonParseError>
+#include <QJsonValue>
 #include <cstdlib>
 
 #include "corelib/kernel/settings.h"
@@ -15,6 +20,8 @@
 #include "lxlib/global/const.h"
 #include "lxlib/kernel/stddir.h"
 #include "corelib/kernel/stddir.h"
+
+#include <QDebug>
 
 namespace lxservice{
 namespace zhuchao{
@@ -81,6 +88,10 @@ ServiceInvokeResponse NewDeployWrapper::deploy(const ServiceInvokeRequest &reque
       goto process_error;
    }
    copyFilesToDeployDir();
+   if(!m_context->deployStatus){
+      goto process_error;
+   }
+   processInfo();
    if(!m_context->deployStatus){
       goto process_error;
    }
@@ -152,6 +163,31 @@ void NewDeployWrapper::copyFilesToDeployDir()
    if(!Filesystem::copyDir(sourceDir, m_context->deployDir, true)){
       m_context->deployErrorString = Filesystem::getErrorString();
       m_context->deployStatus = false;
+   }
+}
+
+void NewDeployWrapper::processInfo()
+{
+   m_step = STEP_PROCESS_INFO;
+   m_context->response.setDataItem("step", STEP_PROCESS_INFO);
+   m_context->response.setDataItem("msg", "正在处理信息替换");
+   writeInterResponse(m_context->request, m_context->response);
+   QString cfgFilename = m_context->deployDir + "/Config/Application.config.json";
+   QByteArray content = Filesystem::fileGetContents(cfgFilename);
+   if(!Filesystem::getOperateStatus()){
+      m_context->deployStatus = false;
+      m_context->deployErrorString = Filesystem::getErrorString();
+   }
+   QJsonDocument doc = QJsonDocument::fromJson(content);
+   QJsonObject rootObject = doc.object();
+   QJsonObject dbCfg = rootObject.value("db").toObject();
+   dbCfg.insert("username", m_dbUser);
+   dbCfg.insert("password", m_dbPassword);
+   rootObject.insert("db", dbCfg);
+   doc.setObject(rootObject);
+   if(-1 == Filesystem::filePutContents(cfgFilename, doc.toJson())){
+      m_context->deployStatus = false;
+      m_context->deployErrorString = Filesystem::getErrorString();
    }
 }
 

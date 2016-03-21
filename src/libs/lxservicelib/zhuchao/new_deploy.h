@@ -42,10 +42,11 @@ public:
    const static int STEP_DOWNLOAD_COMPLETE = 2;
    const static int STEP_EXTRA_PKG = 3;
    const static int STEP_COPY_FILES = 4;
-   const static int STEP_CREATE_DB = 5;
-   const static int STEP_CLEANUP = 6;
-   const static int STEP_FINISH = 7;
-   const static int STEP_ERROR = 8;
+   const static int STEP_PROCESS_INFO = 5;
+   const static int STEP_CREATE_DB = 6;
+   const static int STEP_CLEANUP = 7;
+   const static int STEP_FINISH = 8;
+   const static int STEP_ERROR = 9;
    
    const static QString ZHUCHAO_PKG_NAME_TPL;
    const static QString DEPLOY_DIR_TPL;
@@ -60,6 +61,7 @@ protected:
    QString getDeployTmpDir();
    void unzipPkg(const QString &pkgFilename);
    void copyFilesToDeployDir();
+   void processInfo();
    void createDatabase();
    void cleanupTmpFiles();
 protected:
