@@ -3,9 +3,9 @@
 namespace lxlib{
 namespace global{
 
-QLatin1String get_luoxi_version()
+QString get_luoxi_version()
 {
-   return QLatin1String(LUOXI_VERSION);
+   return QString(LUOXI_VERSION);
 }
 
 }//global

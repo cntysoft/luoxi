@@ -5,12 +5,12 @@
 
 #include "global.h"
 
-namespace umslib{
+namespace lxlib{
 namespace global{
 
-LUOXI_LIB_EXPORT QLatin1String get_luoxi_version();
+LUOXI_LIB_EXPORT QString get_luoxi_version();
 
 }//global
-}//immlib
+}//lxlib
 
 #endif // LUOXI_LIB_COMMON_FUNCS_H
