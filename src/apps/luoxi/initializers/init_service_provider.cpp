@@ -17,6 +17,9 @@ void init_service_provider()
    provider.addServiceToPool("ZhuChao/NewDeploy", [](ServiceProvider& provider)-> AbstractService*{
       return new lxservice::zhuchao::NewDeployWrapper(provider);
    });
+   provider.addServiceToPool("ZhuChao/UpgradeDeploy", [](ServiceProvider& provider)-> AbstractService*{
+      return new lxservice::zhuchao::UpgradeDeployWrapper(provider);
+   });
 }
 
 void cleanup_service_provider()

@@ -134,7 +134,7 @@ void InstanceDeployWrapper::downloadUpgradePkg(const QString &filename)
 {
    //获取相关的配置信息
    Settings& settings = Application::instance()->getSettings();
-   QSharedPointer<DownloadClient> downloader = getDownloadClient(settings.getValue("metaserverHost").toString(), 
+   QSharedPointer<DownloadClientWrapper> downloader = getDownloadClient(settings.getValue("metaserverHost").toString(), 
                                                                  settings.getValue("metaserverPort").toInt());
    downloader->download(filename);
    m_eventLoop.exec();
@@ -274,23 +274,23 @@ QString InstanceDeployWrapper::getDeployTmpDir()
    return StdDir::getBaseDataDir()+"/deploy/tmp";
 }
 
-QSharedPointer<DownloadClient> InstanceDeployWrapper::getDownloadClient(const QString &host, quint16 port)
+QSharedPointer<DownloadClientWrapper> InstanceDeployWrapper::getDownloadClient(const QString &host, quint16 port)
 {
    if(m_downloadClient.isNull()){
-      m_downloadClient.reset(new DownloadClient(getServiceInvoker(host, port)));
-      connect(m_downloadClient.data(), &DownloadClient::beginDownload, this, [&](){
+      m_downloadClient.reset(new DownloadClientWrapper(getServiceInvoker(host, port)));
+      connect(m_downloadClient.data(), &DownloadClientWrapper::beginDownload, this, [&](){
          m_context->response.setDataItem("step", STEP_DOWNLOAD_PKG);
          m_context->response.setDataItem("msg", "开始下载软件包");
          writeInterResponse(m_context->request, m_context->response);
       });
-      QObject::connect(m_downloadClient.data(), &DownloadClient::downloadError, this, [&](int, const QString &errorMsg){
+      QObject::connect(m_downloadClient.data(), &DownloadClientWrapper::downloadError, this, [&](int, const QString &errorMsg){
          m_eventLoop.exit();
          m_isInAction = false;
          m_step = STEP_PREPARE;
          m_context->deployStatus = false;
          m_context->deployErrorString = errorMsg;
       });
-      connect(m_downloadClient.data(), &DownloadClient::downloadComplete, this, [&](){
+      connect(m_downloadClient.data(), &DownloadClientWrapper::downloadComplete, this, [&](){
          m_context->response.setDataItem("step", STEP_DOWNLOAD_COMPLETE);
          m_context->response.setStatus(true);
          m_context->response.setDataItem("msg", "下载软件包完成");

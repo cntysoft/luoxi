@@ -8,7 +8,7 @@
 #include <QJSValue>
 #include <QFile>
 
-#include "upgrade.h"
+#include "upgrade_deploy.h"
 
 #include "corelib/kernel/settings.h"
 #include "corelib/kernel/application.h"
@@ -32,12 +32,12 @@ using sn::corelib::ErrorInfo;
 using sn::corelib::dump_mysql_table;
 using sn::corelib::utils::Version;
 
-const QString UpgradeWrapper::ZHUCHAO_UPGRADE_PKG_NAME_TPL = "zhuchaoweb_patch_%1_%2.tar.gz";
-const QString UpgradeWrapper::ZHUCHAO_UPGRADE_DB_META_NAME_TPL = "dbmeta_%1_%2.json";
-const QString UpgradeWrapper::ZHUCHAO_UPGRADE_SCRIPT_NAME_TPL = "upgradescript_%1_%2.js";
-const QString UpgradeWrapper::ZHUCHAO_DB_NAME = "zhuchao";
+const QString UpgradeDeployWrapper::ZHUCHAO_UPGRADE_PKG_NAME_TPL = "zhuchaoweb_patch_%1_%2.tar.gz";
+const QString UpgradeDeployWrapper::ZHUCHAO_UPGRADE_DB_META_NAME_TPL = "dbmeta_%1_%2.json";
+const QString UpgradeDeployWrapper::ZHUCHAO_UPGRADE_SCRIPT_NAME_TPL = "upgradescript_%1_%2.js";
+const QString UpgradeDeployWrapper::ZHUCHAO_DB_NAME = "zhuchao";
 
-UpgradeWrapper::UpgradeWrapper(ServiceProvider &provider)
+UpgradeDeployWrapper::UpgradeDeployWrapper(ServiceProvider &provider)
    : AbstractService(provider)
 {
    Settings& settings = Application::instance()->getSettings();
@@ -46,19 +46,23 @@ UpgradeWrapper::UpgradeWrapper(ServiceProvider &provider)
    m_groupId = settings.getValue("webDeployGroupId", LUOXI_CFG_GROUP_GLOBAL, 8).toInt();
 }
 
-ServiceInvokeResponse UpgradeWrapper::upgrade(const ServiceInvokeRequest &request)
+ServiceInvokeResponse UpgradeDeployWrapper::upgrade(const ServiceInvokeRequest &request)
 {
    if(m_step != STEP_PREPARE){
       throw_exception(ErrorInfo("状态错误"), getErrorContext());
    }
    m_context.reset(new UpgradeContext);
    QMap<QString, QVariant> args = request.getArgs();
-   checkRequireFields(args, {"fromVersion", "toVersion"});
+   checkRequireFields(args, {"fromVersion", "toVersion", "forceUpgrade", "withoutUpgradeScript"});
    QString softwareRepoDir = StdDir::getSoftwareRepoDir();
    m_context->upgradeStatus = true;
    m_context->fromVersion = args.value("fromVersion").toString();
    m_context->toVersion = args.value("toVersion").toString();
-   checkVersion();
+   m_context->forceUpgrade = args.value("forceUpgrade").toBool();
+   m_context->withoutUpgradeScript = args.value("withoutUpgradeScript").toBool();
+   if(!m_context->forceUpgrade){
+      checkVersion();
+   }
    //获取数据库信息
    Settings& settings = Application::instance()->getSettings();
    m_context->dbHost = settings.getValue("dbHost", LUOXI_CFG_GROUP_GLOBAL).toString();
@@ -89,15 +93,17 @@ ServiceInvokeResponse UpgradeWrapper::upgrade(const ServiceInvokeRequest &reques
    unzipPkg(m_context->pkgFilename);
    backupScriptFiles();
    upgradeFiles();
-   runUpgradeScript();
-   if(!m_context->upgradeStatus){
-      response.setDataItem("msg", m_context->upgradeErrorString);
-      writeInterResponse(request, response);
-      response.setStatus(false);
-      response.setDataItem("step", STEP_ERROR);
-      response.setError({-1, "升级失败"});
-      clearState();
-      return response;
+   if(!m_context->withoutUpgradeScript){
+      runUpgradeScript();
+      if(!m_context->upgradeStatus){
+         response.setDataItem("msg", m_context->upgradeErrorString);
+         writeInterResponse(request, response);
+         response.setStatus(false);
+         response.setDataItem("step", STEP_ERROR);
+         response.setError({-1, "升级失败"});
+         clearState();
+         return response;
+      }
    }
    upgradeComplete();
    response.setSerial(request.getSerial());
@@ -108,7 +114,7 @@ ServiceInvokeResponse UpgradeWrapper::upgrade(const ServiceInvokeRequest &reques
    return response;
 }
 
-void UpgradeWrapper::checkVersion()
+void UpgradeDeployWrapper::checkVersion()
 {
    QString versionFilename = m_deployDir + "/VERSION";
    //无版本文件强行更新
@@ -129,17 +135,17 @@ void UpgradeWrapper::checkVersion()
    }
 }
 
-void UpgradeWrapper::downloadUpgradePkg(const QString &filename)
+void UpgradeDeployWrapper::downloadUpgradePkg(const QString &filename)
 {
    //获取相关的配置信息
    Settings& settings = Application::instance()->getSettings();
-   QSharedPointer<DownloadClient> downloader = getDownloadClient(settings.getValue("upgrademgrMasterHost").toString(), 
-                                                                 settings.getValue("upgrademgrMasterPort").toInt());
+   QSharedPointer<DownloadClientWrapper> downloader = getDownloadClient(settings.getValue("metaserverHost").toString(), 
+                                                                 settings.getValue("metaserverPort").toInt());
    downloader->download(filename);
    m_eventLoop.exec();
 }
 
-void UpgradeWrapper::backupScriptFiles()
+void UpgradeDeployWrapper::backupScriptFiles()
 {
    m_step = STEP_BACKUP_FILES;
    m_context->response.setDataItem("step", STEP_BACKUP_FILES);
@@ -206,7 +212,7 @@ void UpgradeWrapper::backupScriptFiles()
    });
 }
 
-void UpgradeWrapper::upgradeFiles()
+void UpgradeDeployWrapper::upgradeFiles()
 {
    m_step = STEP_BACKUP_FILES;
    m_context->response.setDataItem("step", STEP_UPGRADE_FILES);
@@ -234,7 +240,7 @@ void UpgradeWrapper::upgradeFiles()
    }
 }
 
-void UpgradeWrapper::backupDatabase()
+void UpgradeDeployWrapper::backupDatabase()
 {
    m_step = STEP_BACKUP_DB;
    m_context->response.setDataItem("step", STEP_BACKUP_DB);
@@ -279,7 +285,7 @@ void UpgradeWrapper::backupDatabase()
    }
 }
 
-bool UpgradeWrapper::runUpgradeScript()
+bool UpgradeDeployWrapper::runUpgradeScript()
 {
    m_step = STEP_RUN_UPGRADE_SCRIPT;
    m_context->response.setDataItem("step", STEP_RUN_UPGRADE_SCRIPT);
@@ -295,7 +301,7 @@ bool UpgradeWrapper::runUpgradeScript()
    return scriptEngine->exec(upgradeScriptFilename);
 }
 
-void UpgradeWrapper::upgradeComplete()
+void UpgradeDeployWrapper::upgradeComplete()
 {
    m_step= STEP_FINISH;
    //更新版本文件
@@ -308,7 +314,7 @@ void UpgradeWrapper::upgradeComplete()
    clearState();
 }
 
-void UpgradeWrapper::clearState()
+void UpgradeDeployWrapper::clearState()
 {
    m_context.clear();
    m_step = STEP_PREPARE;
@@ -321,7 +327,7 @@ void UpgradeWrapper::clearState()
    }
 }
 
-void UpgradeWrapper::unzipPkg(const QString &pkgFilename)
+void UpgradeDeployWrapper::unzipPkg(const QString &pkgFilename)
 {
    QString targetExtraDir(getUpgradeTmpDir());
    if(!Filesystem::dirExist(targetExtraDir)){
@@ -338,23 +344,23 @@ void UpgradeWrapper::unzipPkg(const QString &pkgFilename)
    }
 }
 
-QSharedPointer<DownloadClient> UpgradeWrapper::getDownloadClient(const QString &host, quint16 port)
+QSharedPointer<DownloadClientWrapper> UpgradeDeployWrapper::getDownloadClient(const QString &host, quint16 port)
 {
    if(m_downloadClient.isNull()){
-      m_downloadClient.reset(new DownloadClient(getServiceInvoker(host, port)));
-      connect(m_downloadClient.data(), &DownloadClient::beginDownload, this, [&](){
+      m_downloadClient.reset(new DownloadClientWrapper(getServiceInvoker(host, port)));
+      connect(m_downloadClient.data(), &DownloadClientWrapper::beginDownload, this, [&](){
          m_context->response.setDataItem("step", STEP_DOWNLOAD_PKG);
          m_context->response.setDataItem("msg", "开始下载软件包");
          writeInterResponse(m_context->request, m_context->response);
       });
-      QObject::connect(m_downloadClient.data(), &DownloadClient::downloadError, this, [&](int, const QString &errorMsg){
+      QObject::connect(m_downloadClient.data(), &DownloadClientWrapper::downloadError, this, [&](int, const QString &errorMsg){
          m_eventLoop.exit();
          m_isInAction = false;
          m_step = STEP_PREPARE;
          m_context->upgradeStatus = false;
          m_context->upgradeErrorString = errorMsg;
       });
-      connect(m_downloadClient.data(), &DownloadClient::downloadComplete, this, [&](){
+      connect(m_downloadClient.data(), &DownloadClientWrapper::downloadComplete, this, [&](){
          m_context->response.setDataItem("step", STEP_DOWNLOAD_COMPLETE);
          m_context->response.setStatus(true);
          m_context->response.setDataItem("msg", "下载软件包完成");
@@ -366,7 +372,7 @@ QSharedPointer<DownloadClient> UpgradeWrapper::getDownloadClient(const QString &
    return m_downloadClient;
 }
 
-QSharedPointer<UpgradeEnvEngine> UpgradeWrapper::getUpgradeScriptEngine()
+QSharedPointer<UpgradeEnvEngine> UpgradeDeployWrapper::getUpgradeScriptEngine()
 {
    if(m_upgradeScriptEngine.isNull()){
       m_upgradeScriptEngine.reset(new UpgradeEnvEngine(m_context->dbHost, m_context->dbUser, 
@@ -390,17 +396,17 @@ QSharedPointer<UpgradeEnvEngine> UpgradeWrapper::getUpgradeScriptEngine()
    return m_upgradeScriptEngine;
 }
 
-QString UpgradeWrapper::getBackupDir()
+QString UpgradeDeployWrapper::getBackupDir()
 {
    return StdDir::getBaseDataDir()+"/backup";
 }
 
-QString UpgradeWrapper::getUpgradeTmpDir()
+QString UpgradeDeployWrapper::getUpgradeTmpDir()
 {
    return StdDir::getBaseDataDir()+"/upgrade/tmp";
 }
 
-void UpgradeWrapper::notifySocketDisconnect(QTcpSocket*)
+void UpgradeDeployWrapper::notifySocketDisconnect(QTcpSocket*)
 {
    clearState();
 }

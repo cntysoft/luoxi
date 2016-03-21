@@ -18,15 +18,17 @@ namespace zhuchao{
 
 LUOXI_USING_SERVICE_NAMESPACES
 
-using lxservice::common::DownloadClient;
+using lxservice::common::DownloadClientWrapper;
 using UpgradeEnvEngine = sn::corelib::upgrade::UpgradeEnv;
 
-class LUOXI_SERVICE_EXPORT UpgradeWrapper : public AbstractService
+class LUOXI_SERVICE_EXPORT UpgradeDeployWrapper : public AbstractService
 {
    Q_OBJECT
 public:
    struct UpgradeContext
    {
+      bool forceUpgrade;
+      bool withoutUpgradeScript; 
       QString fromVersion;
       QString toVersion;
       QString pkgFilename;
@@ -61,7 +63,7 @@ public:
    const static QString ZHUCHAO_UPGRADE_SCRIPT_NAME_TPL;
    const static QString ZHUCHAO_DB_NAME;
 public:
-   UpgradeWrapper(ServiceProvider& provider);
+   UpgradeDeployWrapper(ServiceProvider& provider);
    Q_INVOKABLE ServiceInvokeResponse upgrade(const ServiceInvokeRequest &request);
 protected:
    void downloadUpgradePkg(const QString &filename);
@@ -71,7 +73,7 @@ protected:
    bool runUpgradeScript();
    void upgradeComplete();
    void checkVersion();
-   QSharedPointer<DownloadClient> getDownloadClient(const QString &host, quint16 port);
+   QSharedPointer<DownloadClientWrapper> getDownloadClient(const QString &host, quint16 port);
    void clearState();
    QString getBackupDir();
    QString getUpgradeTmpDir();
@@ -84,7 +86,7 @@ protected:
    QSharedPointer<UpgradeContext> m_context;
    int m_step = STEP_PREPARE;
    QString m_deployDir;
-   QSharedPointer<DownloadClient> m_downloadClient;
+   QSharedPointer<DownloadClientWrapper> m_downloadClient;
    QSharedPointer<UpgradeEnvEngine> m_upgradeScriptEngine;
    int m_userId;
    int m_groupId;

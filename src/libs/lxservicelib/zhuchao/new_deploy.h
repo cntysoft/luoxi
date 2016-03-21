@@ -17,7 +17,7 @@ namespace zhuchao{
 
 LUOXI_USING_SERVICE_NAMESPACES
 
-using lxservice::common::DownloadClient;
+using lxservice::common::DownloadClientWrapper;
 using SqlEngine = sn::corelib::db::engine::Engine;
 
 class LUOXI_SERVICE_EXPORT NewDeployWrapper : public AbstractService
@@ -63,7 +63,7 @@ protected:
    void createDatabase();
    void cleanupTmpFiles();
 protected:
-   QSharedPointer<DownloadClient> getDownloadClient(const QString &host, quint16 port);
+   QSharedPointer<DownloadClientWrapper> getDownloadClient(const QString &host, quint16 port);
    //protected:
    //   virtual void notifySocketDisconnect(QTcpSocket *socket);
 protected:
@@ -71,7 +71,7 @@ protected:
    QSharedPointer<NewDeployContext> m_context;
    int m_step = STEP_PREPARE;
    QString m_deployBaseDir;
-   QSharedPointer<DownloadClient> m_downloadClient;
+   QSharedPointer<DownloadClientWrapper> m_downloadClient;
    QSharedPointer<SqlEngine> m_sqlEngine;
    int m_userId;
    int m_groupId;

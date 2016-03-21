@@ -19,7 +19,7 @@ namespace kelecloud{
 
 LUOXI_USING_SERVICE_NAMESPACES
 
-using lxservice::common::DownloadClient;
+using lxservice::common::DownloadClientWrapper;
 using SqlEngine = sn::corelib::db::engine::Engine;
 using sn::corelib::cloud::aliyun::dns::DnsResolve;
 using sn::corelib::cloud::aliyun::dns::DnsApiCaller;
@@ -78,7 +78,7 @@ protected:
    void restartNginx();
    void cleanupTmpFiles();
 protected:
-   QSharedPointer<DownloadClient> getDownloadClient(const QString &host, quint16 port);
+   QSharedPointer<DownloadClientWrapper> getDownloadClient(const QString &host, quint16 port);
    QSharedPointer<DnsResolve> getDnsResolver();
    //protected:
    //   virtual void notifySocketDisconnect(QTcpSocket *socket);
@@ -89,7 +89,7 @@ protected:
    QString m_deployBaseDir;
    QString m_nginxConfDir;
    QString m_deployServerAddress;
-   QSharedPointer<DownloadClient> m_downloadClient;
+   QSharedPointer<DownloadClientWrapper> m_downloadClient;
    QSharedPointer<SqlEngine> m_sqlEngine;
    QSharedPointer<DnsResolve> m_dnsResolver;
    int m_userId;

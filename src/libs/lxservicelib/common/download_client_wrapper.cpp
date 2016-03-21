@@ -12,13 +12,13 @@ using lxlib::kernel::StdDir;
 
 void init_download_handler(const ServiceInvokeResponse &response, void* args)
 {
-   DownloadClient *self = static_cast<DownloadClient*>(args);
+   DownloadClientWrapper *self = static_cast<DownloadClientWrapper*>(args);
    if(!response.getStatus()){
       self->emitDownloadError(response.getError().first, response.getError().second);
       self->clearState();
    }else{
       const QMap<QString, QVariant> &args = response.getData();
-      self->m_step = DownloadClient::DOWNLOAD_STEP_META_RECEIVED;
+      self->m_step = DownloadClientWrapper::DOWNLOAD_STEP_META_RECEIVED;
       self->m_context->chunkSize = args.value("chunkSize").toInt();
       self->m_context->cycleSize = args.value("cycleSize").toInt();
       self->m_context->fileSize = args.value("fileSize").toInt();
@@ -28,7 +28,7 @@ void init_download_handler(const ServiceInvokeResponse &response, void* args)
 
 void download_cycle_handler(const ServiceInvokeResponse &response, void* args)
 {
-   DownloadClient *self = static_cast<DownloadClient*>(args);
+   DownloadClientWrapper *self = static_cast<DownloadClientWrapper*>(args);
    if(!response.getStatus()){
       self->emitDownloadError(response.getError().first, response.getError().second);
       self->clearState();
@@ -55,23 +55,24 @@ void download_cycle_handler(const ServiceInvokeResponse &response, void* args)
    }
 }
 
-void DownloadClient::emitDownloadError(int errorCode, const QString &errorMsg)
+void DownloadClientWrapper::emitDownloadError(int errorCode, const QString &errorMsg)
 {
    emit downloadError(errorCode, errorMsg);
 }
 
-void DownloadClient::emitDownloadComplete()
+void DownloadClientWrapper::emitDownloadComplete()
 {
    emit downloadComplete();
 }
 
-DownloadClient::DownloadClient(QSharedPointer<ServiceInvoker> serviceInvoker)
-   :m_serviceInvoker(serviceInvoker)
+DownloadClientWrapper::DownloadClientWrapper(QSharedPointer<ServiceInvoker> serviceInvoker)
+   :m_serviceInvoker(serviceInvoker),m_status(true)
 {
-   connect(m_serviceInvoker.data(), &ServiceInvoker::connectedToServerSignal, this, &DownloadClient::connectToServerHandler);
+   connect(m_serviceInvoker.data(), &ServiceInvoker::connectedToServerSignal, this, &DownloadClientWrapper::connectToServerHandler);
+   connect(m_serviceInvoker.data(), &ServiceInvoker::connectErrorSignal, this, &DownloadClientWrapper::connectErrorHandler);
 }
 
-void DownloadClient::download(const QString &filename)
+void DownloadClientWrapper::download(const QString &filename)
 {
    emit beginDownload();
    m_step = DOWNLOAD_STEP_START;
@@ -80,7 +81,7 @@ void DownloadClient::download(const QString &filename)
    m_context->filename = filename;
 }
 
-void DownloadClient::connectToServerHandler()
+void DownloadClientWrapper::connectToServerHandler()
 {
    
    ServiceInvokeRequest request("Common/DownloadServer", "init", {
@@ -89,7 +90,13 @@ void DownloadClient::connectToServerHandler()
    m_serviceInvoker->request(request, init_download_handler, static_cast<void*>(this));
 }
 
-void DownloadClient::beginRetrieveData()
+void DownloadClientWrapper::connectErrorHandler()
+{
+   m_status = false;
+   emit downloadError(-1, "连接到下载服务器失败");
+}
+
+void DownloadClientWrapper::beginRetrieveData()
 {
    QString repoDir(StdDir::getSoftwareRepoDir());
    if(!Filesystem::fileExist(repoDir)){
@@ -108,7 +115,7 @@ void DownloadClient::beginRetrieveData()
    downloadCycle();
 }
 
-void DownloadClient::downloadCycle()
+void DownloadClientWrapper::downloadCycle()
 {
    int retrieveSize = qMin(m_context->fileSize - m_context->downloadPointer, m_context->chunkSize);
    ServiceInvokeRequest request("Common/DownloadServer", "sendData", {
@@ -118,17 +125,19 @@ void DownloadClient::downloadCycle()
    m_serviceInvoker->request(request, download_cycle_handler, static_cast<void*>(this));
 }
 
-DownloadClient::~DownloadClient()
+DownloadClientWrapper::~DownloadClientWrapper()
 {
-   disconnect(m_serviceInvoker.data(), &ServiceInvoker::connectedToServerSignal, this, &DownloadClient::connectToServerHandler);
+   disconnect(m_serviceInvoker.data(), &ServiceInvoker::connectedToServerSignal, this, &DownloadClientWrapper::connectToServerHandler);
 }
-void DownloadClient::clearState()
+
+void DownloadClientWrapper::clearState()
 {
    if(!m_context.isNull() && nullptr != m_context->targetFile){
       delete m_context->targetFile;
    }
    m_context.clear();
    m_step = DOWNLOAD_STEP_PREPARE;
+   m_status = true;
 }
 
 }//common

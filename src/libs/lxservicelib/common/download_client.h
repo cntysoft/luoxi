@@ -16,7 +16,7 @@ namespace common{
 
 using sn::corelib::network::ServiceInvoker;
 
-class LUOXI_SERVICE_EXPORT DownloadClient : public QObject
+class LUOXI_SERVICE_EXPORT DownloadClientWrapper : public QObject
 {
    Q_OBJECT
 public:
@@ -38,17 +38,18 @@ public:
    friend void init_download_handler(const ServiceInvokeResponse &response, void* args);
    friend void download_cycle_handler(const ServiceInvokeResponse &response, void* args);
 public:
-   DownloadClient(QSharedPointer<ServiceInvoker> serviceInvoker);
+   DownloadClientWrapper(QSharedPointer<ServiceInvoker> serviceInvoker);
    void download(const QString &filename);
    void emitDownloadError(int errorCode, const QString &errorMsg);
    void emitDownloadComplete();
    void clearState();
-   ~DownloadClient();
+   ~DownloadClientWrapper();
 protected:
    void beginRetrieveData();
    void downloadCycle();
 protected slots:
    void connectToServerHandler();
+   void connectErrorHandler();
 signals:
    void beginDownload();
    void downloadError(int errorCode, const QString &errorMsg);
@@ -57,6 +58,7 @@ protected:
    QSharedPointer<DownloadContext> m_context;
    int m_step = DOWNLOAD_STEP_PREPARE;
    QSharedPointer<ServiceInvoker> m_serviceInvoker;
+   bool m_status;
 };
 
 }//common
