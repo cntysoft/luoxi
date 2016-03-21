@@ -7,7 +7,8 @@ Project
    property bool enableRPath: true
    property string libDirName: "lib"
    property string appInstallDir : "bin"
-   property string resourcesInstallDir: "share"
+   property string installRoot: "/usr/local"
+   property string resourcesInstallDir: "share/deploysystem"
    property string luoxiVersion: "0.0.1"
    property stringList libRPaths: {
       if (!enableRPath){

@@ -11,10 +11,23 @@ Product {
    consoleApplication: true
    destinationDirectory: "bin"
    cpp.cxxLanguageVersion: "c++14"
-   cpp.defines: base.concat([
-                               'LUOXI_INSTALL_ROOT="' + qbs.installRoot + '"',
-                               'LUOXI_SHARE_RES_DIR="' + qbs.installRoot+'/'+project.resourcesInstallDir+ '"'
-                            ])
+   cpp.defines : {
+      var defines = [];
+      var resourceDir;
+      var installRoot;
+      if(qbs.buildVariant == "debug"){
+         resourceDir = 'LUOXI_SHARE_RES_DIR="' + qbs.installRoot+'/'+project.resourcesInstallDir+ '"';
+         installRoot = 'LUOXI_INSTALL_ROOT="' + qbs.installRoot + '"';
+      }else{
+         resourceDir = 'LUOXI_SHARE_RES_DIR="' + project.installRoot+'/'+project.resourcesInstallDir+ '"';
+         installRoot = 'LUOXI_INSTALL_ROOT="' + project.installRoot + '"';
+      }
+      defines = defines.concat([
+                                  installRoot,
+                                  resourceDir,
+                               ]);
+      return defines;
+   }
    Group {
       fileTagsFilter: product.type
       qbs.install: true
