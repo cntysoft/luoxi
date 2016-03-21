@@ -5,6 +5,7 @@
 #include <QProcessEnvironment>
 #include <QVariant>
 #include <QByteArray>
+#include <cstdlib>
 
 #include "corelib/kernel/settings.h"
 #include "corelib/kernel/application.h"
@@ -14,8 +15,6 @@
 #include "lxlib/global/const.h"
 #include "lxlib/kernel/stddir.h"
 #include "corelib/kernel/stddir.h"
-
-#include <QDebug>
 
 namespace lxservice{
 namespace zhuchao{
