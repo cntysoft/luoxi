@@ -106,6 +106,7 @@ ServiceInvokeResponse NewDeployWrapper::deploy(const ServiceInvokeRequest &reque
    response.setStatus(true);
    response.setDataItem("msg", "筑巢部署完成");
    response.setDataItem("step", STEP_FINISH);
+   clearState();
    return response;
 process_error:
    response.setDataItem("msg", m_context->deployErrorString);
