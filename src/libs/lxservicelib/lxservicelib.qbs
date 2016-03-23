@@ -58,18 +58,25 @@ Product
       files : [
            "download_client.h",
            "download_client_wrapper.cpp",
-           "server_info.h",
-           "server_info_wrapper.cpp",
        ]
    }
    Group {
       name : "zhuchao"
       prefix : name + "/"
       files : [
-           "new_deploy.h",
-           "new_deploy_wrapper.cpp",
-           "upgrade_deploy.h",
-           "upgrade_deploy_wrapper.cpp",
+         "new_deploy.h",
+         "new_deploy_wrapper.cpp",
+         "upgrade_deploy.h",
+         "upgrade_deploy_wrapper.cpp",
+      ]
+   }
+   
+   Group {
+      name : "serverstatus"
+      prefix : name + "/"
+      files : [
+           "server_info.h",
+           "server_info_wrapper.cpp",
        ]
    }
 }

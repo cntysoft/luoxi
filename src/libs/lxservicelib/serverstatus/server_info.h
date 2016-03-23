@@ -11,7 +11,7 @@
 #include "corelib/network/rpc/service_provider.h"
 
 namespace lxservice{
-namespace common{
+namespace serverstatus{
 
 LUOXI_USING_SERVICE_NAMESPACES
 
@@ -24,7 +24,7 @@ public:
 };
 
 
-}//common
+}//serverstatus
 }//lxservice
 
 #endif // LUOXI_SERVICE_COMMON_SERVER_INFO_H

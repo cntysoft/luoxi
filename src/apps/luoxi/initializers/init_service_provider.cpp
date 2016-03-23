@@ -11,8 +11,8 @@ using sn::corelib::network::AbstractService;
 void init_service_provider()
 {
    ServiceProvider& provider = ServiceProvider::instance();
-   provider.addServiceToPool("Common/ServerInfo", [](ServiceProvider& provider)-> AbstractService*{
-      return new lxservice::common::ServerInfoWrapper(provider);
+   provider.addServiceToPool("ServerStatus/ServerInfo", [](ServiceProvider& provider)-> AbstractService*{
+      return new lxservice::serverstatus::ServerInfoWrapper(provider);
    });
    provider.addServiceToPool("KeleCloud/InstanceDeploy", [](ServiceProvider& provider)-> AbstractService*{
       return new lxservice::kelecloud::InstanceDeployWrapper(provider);

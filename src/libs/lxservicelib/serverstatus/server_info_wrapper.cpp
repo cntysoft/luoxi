@@ -8,7 +8,7 @@
 #include "corelib/io/filesystem.h"
 
 namespace lxservice{
-namespace common{
+namespace serverstatus{
 
 using lxlib::kernel::StdDir;
 using sn::corelib::Filesystem;
@@ -20,12 +20,12 @@ ServerInfoWrapper::ServerInfoWrapper(ServiceProvider &provider)
 
 ServiceInvokeResponse ServerInfoWrapper::getVersionInfo(const ServiceInvokeRequest &request)
 {
-   ServiceInvokeResponse response("Common/ServerInfo/getVersionInfo", true);
+   ServiceInvokeResponse response("ServerStatus/ServerInfo/getVersionInfo", true);
    response.setSerial(request.getSerial());
    response.setDataItem("version", lxlib::global::get_luoxi_version());
    response.setIsFinal(true);
    return response;
 }
 
-}//common
+}//serverstatus
 }//lxservice
