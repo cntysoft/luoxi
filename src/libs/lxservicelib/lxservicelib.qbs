@@ -40,10 +40,10 @@ Product
       qbs.installDir: "lib"
    }
    files: [
-      "global_defs.h",
-      "macros.h",
-      "service_repo.h",
-   ]
+        "global_defs.h",
+        "macros.h",
+        "service_repo.h",
+    ]
    Group {
       name : "kelecloud"
       prefix : name + "/"
@@ -58,17 +58,21 @@ Product
       files : [
            "download_client.h",
            "download_client_wrapper.cpp",
+           "upload_client.h",
+           "upload_client_wrapper.cpp",
        ]
    }
    Group {
       name : "zhuchao"
       prefix : name + "/"
       files : [
-         "new_deploy.h",
-         "new_deploy_wrapper.cpp",
-         "upgrade_deploy.h",
-         "upgrade_deploy_wrapper.cpp",
-      ]
+           "db_backup.h",
+           "db_backup_wrapper.cpp",
+           "new_deploy.h",
+           "new_deploy_wrapper.cpp",
+           "upgrade_deploy.h",
+           "upgrade_deploy_wrapper.cpp",
+       ]
    }
    
    Group {

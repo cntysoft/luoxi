@@ -18,7 +18,6 @@
 #include "corelib/global/common_funcs.h"
 #include "corelib/kernel/errorinfo.h"
 #include "corelib/utils/version.h"
-#include <QDebug>
 
 namespace lxservice{
 namespace zhuchao{
