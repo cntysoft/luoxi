@@ -183,16 +183,10 @@ void NewDeployWrapper::processInfo()
    }
    QJsonDocument doc = QJsonDocument::fromJson(content);
    QJsonObject rootObject = doc.object();
-   QJsonObject moduleHostNamesCfg = rootObject.value("moduleHostNames").toObject();
    QJsonObject dbCfg = rootObject.value("db").toObject();
    dbCfg.insert("username", m_dbUser);
    dbCfg.insert("password", m_dbPassword);
    rootObject.insert("db", dbCfg);
-   moduleHostNamesCfg.insert("Provider", QString("provider.%1").arg(m_deployDomain));
-   moduleHostNamesCfg.insert("Buyer", QString("i.%1").arg(m_deployDomain));
-   moduleHostNamesCfg.insert("Site", QString("([a-z0-9]+).site.%1").arg(m_deployDomain));
-   moduleHostNamesCfg.insert("Pages", QString("www.%1").arg(m_deployDomain));
-   rootObject.insert("moduleHostNames", moduleHostNamesCfg);
    doc.setObject(rootObject);
    if(-1 == Filesystem::filePutContents(cfgFilename, doc.toJson())){
       m_context->deployStatus = false;
