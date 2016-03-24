@@ -82,6 +82,7 @@ protected:
    QString m_dbHost;
    QString m_dbUser;
    QString m_dbPassword;
+   QString m_deployDomain;
 };
 
 }//zhuchao

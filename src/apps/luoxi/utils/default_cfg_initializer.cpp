@@ -8,10 +8,12 @@ namespace luoxi{
 using sn::corelib::Settings;
 
 static void init_global_cfg(Settings &settings);
+static void init_zhuchao_cfg(Settings &settings);
 
 void init_defualt_cfg(Settings& settings)
 {
    init_global_cfg(settings);
+   init_zhuchao_cfg(settings);
 }
 
 static void init_global_cfg(Settings& settings)
@@ -32,6 +34,12 @@ static void init_global_cfg(Settings& settings)
    settings.setValue("aliAccessKeySecret", "3edbGFcrayDU4kaDrS004sp5J5Auod", LUOXI_CFG_GROUP_GLOBAL);
    settings.setValue("deployServerAddress", "127.0.0.1", LUOXI_CFG_GROUP_GLOBAL);
 }
+
+static void init_zhuchao_cfg(Settings& settings)
+{
+   settings.setValue("deployServerDomain", "kelecloud.cn", LUOXI_CFG_GROUP_ZHUCHAO);
+}
+
 
 
 }//luoxi

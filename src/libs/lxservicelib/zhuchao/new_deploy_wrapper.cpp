@@ -48,6 +48,7 @@ NewDeployWrapper::NewDeployWrapper(ServiceProvider& provider)
    m_dbHost = settings.getValue("dbHost", LUOXI_CFG_GROUP_GLOBAL).toString();
    m_dbUser = settings.getValue("dbUser", LUOXI_CFG_GROUP_GLOBAL).toString();
    m_dbPassword = settings.getValue("dbPassword", LUOXI_CFG_GROUP_GLOBAL).toString();
+   m_deployDomain = settings.getValue("deployServerDomain", LUOXI_CFG_GROUP_ZHUCHAO).toString();
    m_sqlEngine.reset(new SqlEngine(SqlEngine::QMYSQL, {
                                       {"host", m_dbHost},
                                       {"username", m_dbUser},
@@ -182,10 +183,16 @@ void NewDeployWrapper::processInfo()
    }
    QJsonDocument doc = QJsonDocument::fromJson(content);
    QJsonObject rootObject = doc.object();
+   QJsonObject moduleHostNamesCfg = rootObject.value("moduleHostNames").toObject();
    QJsonObject dbCfg = rootObject.value("db").toObject();
    dbCfg.insert("username", m_dbUser);
    dbCfg.insert("password", m_dbPassword);
    rootObject.insert("db", dbCfg);
+   moduleHostNamesCfg.insert("Provider", QString("provider.%1").arg(m_deployDomain));
+   moduleHostNamesCfg.insert("Buyer", QString("i.%1").arg(m_deployDomain));
+   moduleHostNamesCfg.insert("Site", QString("([a-z0-9]+).site.%1").arg(m_deployDomain));
+   moduleHostNamesCfg.insert("Pages", QString("www.%1").arg(m_deployDomain));
+   rootObject.insert("moduleHostNames", moduleHostNamesCfg);
    doc.setObject(rootObject);
    if(-1 == Filesystem::filePutContents(cfgFilename, doc.toJson())){
       m_context->deployStatus = false;
