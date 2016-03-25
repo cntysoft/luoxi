@@ -195,10 +195,13 @@ QSharedPointer<UploadClientWrapper> DbBackupWrapper::getUploadClient(const QStri
 
 void DbBackupWrapper::clearState()
 {
-   m_context.clear();
-   m_step = STEP_PREPARE;
    QString zipFilename = getBackupTmpDir() +'/'+m_context->dbBackupFilename;
    QString sqlDir = m_context->dbBackupFilename.mid(0, m_context->dbBackupFilename.size() - 7);
+   m_context.clear();
+   m_step = STEP_PREPARE;
+   if(!m_uploadClient.isNull()){
+      m_uploadClient->clearState();
+   }
    if(Filesystem::fileExist(zipFilename)){
       Filesystem::deleteFile(zipFilename);
    }
