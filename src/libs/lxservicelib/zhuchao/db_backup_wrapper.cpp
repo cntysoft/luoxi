@@ -197,6 +197,14 @@ void DbBackupWrapper::clearState()
 {
    m_context.clear();
    m_step = STEP_PREPARE;
+   QString zipFilename = getBackupTmpDir() +'/'+m_context->dbBackupFilename;
+   QString sqlDir = m_context->dbBackupFilename.mid(0, m_context->dbBackupFilename.size() - 7);
+   if(Filesystem::fileExist(zipFilename)){
+      Filesystem::deleteFile(zipFilename);
+   }
+   if(Filesystem::dirExist(sqlDir)){
+      Filesystem::deleteDirRecusive(sqlDir);
+   }
    //清除残余文件
    if(!m_serviceInvoker.isNull()){
       m_serviceInvoker->disconnectFromServer();
