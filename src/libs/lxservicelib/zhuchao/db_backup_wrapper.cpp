@@ -31,6 +31,7 @@ using sn::corelib::dump_mysql_table;
 using sn::corelib::db::engine::Engine;
 
 const QString DbBackupWrapper::COMPRESS_FILENAME_TPL = "zhuchao_db_%1_%2.tar.gz";
+const QString DbBackupWrapper::ZHUCHAO_DB_SAVED_DIR = "/zhuchao/dbbackup";
 
 DbBackupWrapper::DbBackupWrapper(ServiceProvider& provider)
    :AbstractService(provider)
@@ -64,6 +65,10 @@ ServiceInvokeResponse DbBackupWrapper::backup(const ServiceInvokeRequest &reques
       goto process_error;
    }
    compressSqlFiles();
+   if(!m_context->backupStatus){
+      goto process_error;
+   }
+   uploadSqlCompressFile();
    if(!m_context->backupStatus){
       goto process_error;
    }
@@ -123,14 +128,26 @@ void DbBackupWrapper::compressSqlFiles()
    m_context->response.setDataItem("msg", "正在压缩sql文件");
    writeInterResponse(m_context->request, m_context->response);
    QProcess process;
+   process.setWorkingDirectory(getBackupTmpDir());
    QStringList args;
-   args << "-czvf" << getBackupTmpDir() +'/'+m_context->dbBackupFilename << getBackupTmpDir()+'/'+m_context->dbBackupFilename.mid(0, m_context->dbBackupFilename.size() - 7);
+   args << "-czvf" << getBackupTmpDir() +'/'+m_context->dbBackupFilename << m_context->dbBackupFilename.mid(0, m_context->dbBackupFilename.size() - 7);
    process.start("tar", args);
    bool status = process.waitForFinished(-1);
    if(!status || process.exitCode() != 0){
       m_context->backupStatus = false;
       m_context->backupErrorString = process.readAllStandardError();
    }
+}
+
+void DbBackupWrapper::uploadSqlCompressFile()
+{
+   //获取相关的配置信息
+   Settings& settings = Application::instance()->getSettings();
+   QSharedPointer<UploadClientWrapper> uploader = getUploadClient(settings.getValue("metaserverHost").toString(), 
+                                                                 settings.getValue("metaserverPort").toInt());
+   uploader->changUploadDir(ZHUCHAO_DB_SAVED_DIR);
+   uploader->upload(getBackupTmpDir() +'/'+m_context->dbBackupFilename);
+   m_eventLoop.exec();
 }
 
 QString DbBackupWrapper::getBackupTmpDir()
@@ -149,6 +166,32 @@ void DbBackupWrapper::cleanupTmpFiles()
    }
 }
 
+QSharedPointer<UploadClientWrapper> DbBackupWrapper::getUploadClient(const QString &host, quint16 port)
+{
+   if(m_uploadClient.isNull()){
+      m_uploadClient.reset(new UploadClientWrapper(getServiceInvoker(host, port)));
+      connect(m_uploadClient.data(), &UploadClientWrapper::startUpload, this, [&](){
+         m_context->response.setDataItem("step", STEP_UPLOAD);
+         m_context->response.setDataItem("msg", "开始上传SQL压缩文件");
+         writeInterResponse(m_context->request, m_context->response);
+      });
+      QObject::connect(m_uploadClient.data(), &UploadClientWrapper::uploadError, this, [&](int, const QString &errorMsg){
+         m_eventLoop.exit();
+         m_isInAction = false;
+         m_step = STEP_PREPARE;
+         m_context->backupStatus = false;
+         m_context->backupErrorString = errorMsg;
+      });
+      connect(m_uploadClient.data(), &UploadClientWrapper::uploadSuccess, this, [&](){
+         m_context->response.setDataItem("step", STEP_UPLOAD);
+         m_context->response.setStatus(true);
+         m_context->response.setDataItem("msg", "上传SQL压缩文件完成");
+         writeInterResponse(m_context->request, m_context->response);
+         m_eventLoop.exit();
+      });
+   }
+   return m_uploadClient;
+}
 
 void DbBackupWrapper::clearState()
 {

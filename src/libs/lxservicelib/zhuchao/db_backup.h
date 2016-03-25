@@ -10,6 +10,7 @@
 #include "corelib/network/rpc/invoke_meta.h"
 #include "corelib/network/rpc/service_provider.h"
 #include "corelib/db/metadata/metadata.h"
+#include "lxservicelib/common/upload_client.h"
 
 namespace lxservice{
 namespace zhuchao{
@@ -17,6 +18,7 @@ namespace zhuchao{
 LUOXI_USING_SERVICE_NAMESPACES
 
 using DbMetaData = sn::corelib::db::metadata::Metadata;
+using lxservice::common::UploadClientWrapper;
 
 class LUOXI_SERVICE_EXPORT DbBackupWrapper : public AbstractService
 {
@@ -40,6 +42,7 @@ public:
    const static int STEP_ERROR = 6;
    
    const static QString COMPRESS_FILENAME_TPL;
+   const static QString ZHUCHAO_DB_SAVED_DIR;
 public:
    DbBackupWrapper(ServiceProvider& provider);
    Q_INVOKABLE ServiceInvokeResponse backup(const ServiceInvokeRequest &request);
@@ -47,15 +50,18 @@ protected:
    void clearState();
    void generateSql();
    void compressSqlFiles();
+   void uploadSqlCompressFile();
    QString getBackupTmpDir();
    void cleanupTmpFiles();
 protected:
+   QSharedPointer<UploadClientWrapper> getUploadClient(const QString &host, quint16 port);
    //protected:
    //   virtual void notifySocketDisconnect(QTcpSocket *socket);
 protected:
    bool m_isInAction = false;
    QSharedPointer<DbBackupContext> m_context;
    QSharedPointer<DbMetaData> m_dbMetadata;
+   QSharedPointer<UploadClientWrapper> m_uploadClient;
    int m_step = STEP_PREPARE;
    QString m_deployDir;
    QString m_dbHost;

@@ -30,15 +30,24 @@ public:
       QString filename;
       QFile *targetFile = nullptr;
       int fileSize = 0;
+      int uploaded = 0;
    };
    friend void upload_client_init_upload_handler(const ServiceInvokeResponse &response, void* args);
    friend void upload_client_upload_cycle_handler(const ServiceInvokeResponse &response, void* args);
+   friend void upload_client_notify_complete_handler(const ServiceInvokeResponse &response, void* args);
 public:
    UploadClientWrapper(QSharedPointer<ServiceInvoker> serviceInvoker);
    void upload(const QString &filename);
    void clearState();
+   UploadClientWrapper& changUploadDir(const QString &uploadDir);
+   QString getUploadDir();
    ~UploadClientWrapper();
 protected:
+   void emitUploadError(int errorCode, const QString &errorMsg);
+   void emitUploadProgress(int uploaded, int totalSize, const QString &filename);
+   void emitUploadSuccess();
+   void beginUploadData();
+   void uploadCycle();
 protected slots:
    void connectToServerHandler();
    void connectErrorHandler();
@@ -48,11 +57,12 @@ signals:
    void uploadProgress(int uploaded, int totalSize, const QString &filename);
    void uploadSuccess();
 protected:
+   QSharedPointer<ServiceInvoker> m_serviceInvoker;
+   QString m_uploadDir;
    int m_cycleSize;
    int m_chunkSize;
    QSharedPointer<UploadContext> m_context;
    int m_step = UPLOAD_STEP_PREPARE;
-   QSharedPointer<ServiceInvoker> m_serviceInvoker;
    bool m_status;
 };
 

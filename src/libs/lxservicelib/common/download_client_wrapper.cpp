@@ -128,6 +128,7 @@ void DownloadClientWrapper::downloadCycle()
 DownloadClientWrapper::~DownloadClientWrapper()
 {
    disconnect(m_serviceInvoker.data(), &ServiceInvoker::connectedToServerSignal, this, &DownloadClientWrapper::connectToServerHandler);
+   disconnect(m_serviceInvoker.data(), &ServiceInvoker::connectErrorSignal, this, &DownloadClientWrapper::connectErrorHandler);
 }
 
 void DownloadClientWrapper::clearState()
