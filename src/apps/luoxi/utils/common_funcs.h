@@ -11,8 +11,6 @@ using LuoxiApplication = luoxi::Application;
 
 LuoxiApplication* get_app_ref();
 
-QLatin1String get_luoxi_version();
-
 QString get_application_filepath();
 
 }//luoxi

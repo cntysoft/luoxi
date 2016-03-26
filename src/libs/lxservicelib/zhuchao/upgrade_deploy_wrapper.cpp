@@ -376,6 +376,8 @@ QSharedPointer<UpgradeEnvEngine> UpgradeDeployWrapper::getUpgradeScriptEngine()
    if(m_upgradeScriptEngine.isNull()){
       m_upgradeScriptEngine.reset(new UpgradeEnvEngine(m_context->dbHost, m_context->dbUser, 
                                                        m_context->dbPassword, ZHUCHAO_DB_NAME));
+      m_upgradeScriptEngine->setMetaInfo("ConfigBaseDir", m_deployDir+"/Config");
+      m_upgradeScriptEngine->initUpgradeEnv();
       QJSEngine &engine = m_upgradeScriptEngine->getJsEngine();
       QJSValue env = engine.newObject();
       env.setProperty("deployDir", m_deployDir);
