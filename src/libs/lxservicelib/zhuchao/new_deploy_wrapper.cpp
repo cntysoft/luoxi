@@ -20,9 +20,6 @@
 #include "lxlib/global/const.h"
 #include "lxlib/kernel/stddir.h"
 #include "corelib/kernel/stddir.h"
-
-#include <QDebug>
-
 namespace lxservice{
 namespace zhuchao{
 

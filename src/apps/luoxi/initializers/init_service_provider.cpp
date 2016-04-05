@@ -26,6 +26,9 @@ void init_service_provider()
    provider.addServiceToPool("ZhuChao/DbBackup", [](ServiceProvider& provider)-> AbstractService*{
       return new lxservice::zhuchao::DbBackupWrapper(provider);
    });
+   provider.addServiceToPool("ZhuChao/ShopDbUpgrader", [](ServiceProvider& provider)-> AbstractService*{
+      return new lxservice::zhuchao::ShopDbUpgraderWrapper(provider);
+   });
 }
 
 void cleanup_service_provider()

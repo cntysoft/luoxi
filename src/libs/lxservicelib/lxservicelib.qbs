@@ -70,6 +70,8 @@ Product
            "db_backup_wrapper.cpp",
            "new_deploy.h",
            "new_deploy_wrapper.cpp",
+           "shop_db_upgrader.h",
+           "shop_db_upgrader_wrapper.cpp",
            "upgrade_deploy.h",
            "upgrade_deploy_wrapper.cpp",
        ]

@@ -76,20 +76,16 @@ ServiceInvokeResponse UpgradeDeployWrapper::upgrade(const ServiceInvokeRequest &
    m_context->response = response;
    downloadUpgradePkg(baseFilename);
    if(!m_context->upgradeStatus){
-      response.setDataItem("step", STEP_DOWNLOAD_PKG);
-      response.setDataItem("msg", m_context->upgradeErrorString);
-      writeInterResponse(request, response);
-      response.setStatus(false);
-      response.setDataItem("step", STEP_ERROR);
-      response.setError({-1, "升级失败"});
-      clearState();
-      return response;
+      goto process_error;
    }
    m_context->response.setDataItem("step", STEP_EXTRA_PKG);
    m_context->response.setDataItem("msg", "正在解压升级压缩包");
    m_context->response.setStatus(true);
    writeInterResponse(m_context->request, m_context->response);
    unzipPkg(m_context->pkgFilename);
+   if(!m_context->upgradeStatus){
+      goto process_error;
+   }
    backupScriptFiles();
    upgradeFiles();
    if(!m_context->withoutUpgradeScript){
@@ -105,11 +101,18 @@ ServiceInvokeResponse UpgradeDeployWrapper::upgrade(const ServiceInvokeRequest &
       }
    }
    upgradeComplete();
-   response.setSerial(request.getSerial());
    response.setIsFinal(true);
    response.setStatus(true);
    response.setDataItem("msg", "升级完成");
    response.setDataItem("step", STEP_FINISH);
+   return response;
+process_error:
+   response.setDataItem("msg", m_context->upgradeErrorString);
+   writeInterResponse(request, response);
+   response.setStatus(false);
+   response.setDataItem("step", STEP_ERROR);
+   response.setError({-1, "升级失败"});
+   clearState();
    return response;
 }
 
@@ -339,7 +342,8 @@ void UpgradeDeployWrapper::unzipPkg(const QString &pkgFilename)
    process.start("tar", args);
    bool status = process.waitForFinished(-1);
    if(!status || process.exitCode() != 0){
-      throw ErrorInfo(process.errorString());
+      m_context->upgradeStatus = false;
+      m_context->upgradeErrorString = process.errorString();
    }
 }
 
