@@ -33,6 +33,7 @@ public:
       bool forceDownloadPkg;
       QString fromVersion;
       QString toVersion;
+      QString currentDbname;
       QString pkgFilename;
       ServiceInvokeRequest request;
       ServiceInvokeResponse *response;
@@ -47,11 +48,13 @@ public:
    const static int STEP_DOWNLOAD_PKG = 1;
    const static int STEP_DOWNLOAD_COMPLETE = 2;
    const static int STEP_EXTRA_PKG = 3;
-   const static int STEP_BACKUP_DB = 4;
-   const static int STEP_RUN_UPGRADE_SCRIPT = 5;
-   const static int STEP_CLEANUP = 6;
-   const static int STEP_FINISH = 7;
-   const static int STEP_ERROR = 8;
+   const static int STEP_CYCLE_BEGIN = 4;
+   const static int STEP_BACKUP_DB = 5;
+   const static int STEP_RUN_UPGRADE_SCRIPT = 6;
+   const static int STEP_CYCLE_END = 7;
+   const static int STEP_CLEANUP = 8;
+   const static int STEP_FINISH = 9;
+   const static int STEP_ERROR = 10;
    
    const static QString ZHUCHAO_UPGRADE_PKG_NAME_TPL;
    const static QString ZHUCHAO_UPGRADE_SCRIPT_NAME_TPL;
@@ -61,17 +64,19 @@ public:
    Q_INVOKABLE ServiceInvokeResponse upgrade(const ServiceInvokeRequest &request);
 protected:
    void downloadUpgradePkg(const QString &filename);
+   void upgradeCycle(const QString &dbname);
    void backupDatabase();
    bool runUpgradeScript();
+   void cycleComplete();
    void upgradeComplete();
-   void checkVersion();
+   bool checkVersion();
    QSharedPointer<DownloadClientWrapper> getDownloadClient(const QString &host, quint16 port);
    void clearState();
    QString getBackupDir();
    QString getUpgradeTmpDir();
    void unzipPkg(const QString &pkgFilename);
    QSharedPointer<UpgradeEnvEngine> getUpgradeScriptEngine();
-   void getShopDatabases(const QStringList &databases);
+   void getShopDatabases(QStringList &databases);
    void setupSuccessResponse(ServiceInvokeResponse &response);
    void setupFailureResponse(ServiceInvokeResponse &response);
 protected:

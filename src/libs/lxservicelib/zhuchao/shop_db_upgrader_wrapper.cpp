@@ -4,17 +4,23 @@
 #include <QJSValue>
 #include <QFile>
 #include <QSqlQuery>
+#include <QRegularExpression>
+#include <QRegularExpressionMatch>
+#include <QScopedPointer>
 
 #include "shop_db_upgrader.h"
 
-#include "corelib/kernel/settings.h"
-#include "corelib/kernel/application.h"
+
 #include "lxlib/global/const.h"
 #include "lxlib/kernel/stddir.h"
+#include "corelib/kernel/settings.h"
+#include "corelib/kernel/application.h"
 #include "corelib/io/filesystem.h"
 #include "corelib/global/common_funcs.h"
 #include "corelib/kernel/errorinfo.h"
 #include "corelib/utils/version.h"
+#include "corelib/db/metadata/metadata.h"
+#include "corelib/upgrade/upgrade_env_script_object.h"
 #include <QDebug>
 
 namespace lxservice{
@@ -28,6 +34,8 @@ using sn::corelib::throw_exception;
 using sn::corelib::ErrorInfo;
 using sn::corelib::dump_mysql_table;
 using sn::corelib::utils::Version;
+using DbMetaData = sn::corelib::db::metadata::Metadata;
+using sn::corelib::upgrade::UpgradeEnvScriptObject;
 
 const QString ShopDbUpgraderWrapper::ZHUCHAO_UPGRADE_PKG_NAME_TPL = "zhuchaoweb_patch_%1_%2.tar.gz";
 const QString ShopDbUpgraderWrapper::ZHUCHAO_UPGRADE_SCRIPT_NAME_TPL = "shop_upgradescript_%1_%2.js";
@@ -41,10 +49,10 @@ ShopDbUpgraderWrapper::ShopDbUpgraderWrapper(ServiceProvider &provider)
    m_dbUser = settings.getValue("dbUser", LUOXI_CFG_GROUP_GLOBAL).toString();
    m_dbPassword = settings.getValue("dbPassword", LUOXI_CFG_GROUP_GLOBAL).toString();
    m_dbEngine.reset(new DbEngine(DbEngine::QMYSQL, {
-                                  {"host", m_dbHost},
-                                  {"username", m_dbUser},
-                                  {"password", m_dbPassword}
-                               }));
+                                    {"host", m_dbHost},
+                                    {"username", m_dbUser},
+                                    {"password", m_dbPassword}
+                                 }));
 }
 
 ServiceInvokeResponse ShopDbUpgraderWrapper::upgrade(const ServiceInvokeRequest &request)
@@ -60,6 +68,7 @@ ServiceInvokeResponse ShopDbUpgraderWrapper::upgrade(const ServiceInvokeRequest 
    m_context->fromVersion = args.value("fromVersion").toString();
    m_context->toVersion = args.value("toVersion").toString();
    m_context->forceDownloadPkg = args.value("forceDownloadPkg").toBool();
+   m_context->backupDir = getBackupDir();
    QString baseFilename = QString(ZHUCHAO_UPGRADE_PKG_NAME_TPL).arg(m_context->fromVersion, m_context->toVersion);
    QString upgradePkgFilename = softwareRepoDir + '/' + baseFilename;
    m_context->pkgFilename = upgradePkgFilename;
@@ -80,7 +89,6 @@ ServiceInvokeResponse ShopDbUpgraderWrapper::upgrade(const ServiceInvokeRequest 
    m_context->response->setDataItem("step", STEP_EXTRA_PKG);
    m_context->response->setDataItem("msg", "正在解压升级压缩包");
    m_context->response->setStatus(true);
-
    //升级过程
    writeInterResponse(m_context->request, *m_context->response);
    unzipPkg(m_context->pkgFilename);
@@ -97,21 +105,10 @@ ServiceInvokeResponse ShopDbUpgraderWrapper::upgrade(const ServiceInvokeRequest 
    //变量定义
    QStringList databases;
    getShopDatabases(databases);
-//   backupScriptFiles();
-//   upgradeFiles();
-//   if(!m_context->withoutUpgradeScript){
-//      runUpgradeScript();
-//      if(!m_context->upgradeStatus){
-//         response.setDataItem("msg", m_context->upgradeErrorString);
-//         writeInterResponse(request, response);
-//         response.setStatus(false);
-//         response.setDataItem("step", STEP_ERROR);
-//         response.setError({-1, "升级失败"});
-//         clearState();
-//         return response;
-//      }
-//   }
-//   upgradeComplete();
+   for(const QString &name : databases){
+      upgradeCycle(name);
+   }
+   upgradeComplete();
    setupSuccessResponse(response);
    return response;
 }
@@ -134,33 +131,65 @@ void ShopDbUpgraderWrapper::setupFailureResponse(ServiceInvokeResponse &response
    clearState();
 }
 
-void ShopDbUpgraderWrapper::getShopDatabases(const QStringList &databases)
+void ShopDbUpgraderWrapper::getShopDatabases(QStringList &databases)
 {
    QSharedPointer<QSqlQuery> query = m_dbEngine->query("show databases");
+   QRegularExpression regex("zhuchao_site_\\d+$");
+   regex.setPatternOptions(QRegularExpression::MultilineOption);
    while(query->next()){
-      qDebug() << query->value(0).toString();
+      QString name = query->value(0).toString();
+      QRegularExpressionMatch m = regex.match(name);
+      if(m.hasMatch()){
+         databases << name;
+      }
    }
 }
 
-void ShopDbUpgraderWrapper::checkVersion()
+void ShopDbUpgraderWrapper::upgradeCycle(const QString &dbname)
 {
-//   QString versionFilename = m_deployDir + "/VERSION";
-//   //无版本文件强行更新
-//   if(!Filesystem::fileExist(versionFilename)){
-//      return;
-//   }
-//   QString versionStr = QString(Filesystem::fileGetContents(versionFilename));
-//   Version currentVersion(versionStr);
-//   Version fromVersion(m_context->fromVersion);
-//   Version toVersion(m_context->toVersion);
-//   if(toVersion <= currentVersion){
-//      clearState();
-//      throw_exception(ErrorInfo("系统已经是最新版，无须更新"), getErrorContext());
-//   }
-//   if(fromVersion != currentVersion){
-//      clearState();
-//      throw_exception(ErrorInfo("起始版本跟系统当前版本号不一致"), getErrorContext());
-//   }
+   m_step = STEP_CYCLE_BEGIN;
+   m_context->response->setDataItem("msg", QString("开始升级数据库%1").arg(dbname));
+   writeInterResponse(m_context->request, *m_context->response);
+   m_context->currentDbname = dbname;
+   if(!m_dbEngine->changeSchema(dbname)){
+      m_context->response->setDataItem("msg", QString("升级错误：%1").arg(m_dbEngine->getLastErrorString()));
+      writeInterResponse(m_context->request, *m_context->response);
+      return;
+   }
+   if(!checkVersion()){
+      return;
+   }
+   backupDatabase();
+   runUpgradeScript();
+   if(!m_context->upgradeStatus){
+      m_context->response->setDataItem("msg", QString("运行升级脚本错误：%1").arg(m_context->upgradeErrorString));
+      writeInterResponse(m_context->request, *m_context->response);
+      return;
+   }
+   cycleComplete();
+}
+
+bool ShopDbUpgraderWrapper::checkVersion()
+{
+   QSharedPointer<QSqlQuery> query = m_dbEngine->query("SELECT `value` FROM `sys_m_std_config` WHERE `key` = 'dbVersion'");
+   if(query->size() == 0){
+      return true;
+   }
+   query->first();
+   Version currentVersion(query->value(0).toString());
+   Version fromVersion(m_context->fromVersion);
+   Version toVersion(m_context->toVersion);
+   if(toVersion <= currentVersion){
+      m_context->response->setDataItem("msg", QString("系统已经是最新版，无须更新"));
+      writeInterResponse(m_context->request, *m_context->response);
+      return false;
+   }
+   if(fromVersion != currentVersion){
+      m_context->response->setDataItem("msg", QString("起始版本跟系统当前版本号不一致"));
+      writeInterResponse(m_context->request, *m_context->response);
+      return false;
+   }
+   return true;
 }
 
 void ShopDbUpgraderWrapper::downloadUpgradePkg(const QString &filename)
@@ -168,54 +197,27 @@ void ShopDbUpgraderWrapper::downloadUpgradePkg(const QString &filename)
    //获取相关的配置信息
    Settings& settings = Application::instance()->getSettings();
    QSharedPointer<DownloadClientWrapper> downloader = getDownloadClient(settings.getValue("metaserverHost").toString(), 
-                                                                 settings.getValue("metaserverPort").toInt());
+                                                                        settings.getValue("metaserverPort").toInt());
    downloader->download(filename);
    m_eventLoop.exec();
 }
 
 void ShopDbUpgraderWrapper::backupDatabase()
 {
-//   m_step = STEP_BACKUP_DB;
-//   m_context->response->setDataItem("step", STEP_BACKUP_DB);
-//   m_context->response->setStatus(true);
-//   m_context->response->setDataItem("msg", "正在备份数据库");
-//   writeInterResponse(m_context->request, *m_context->response);
-//   QString metaFilename = m_context->upgradeDir+'/'+QString(ZHUCHAO_UPGRADE_DB_META_NAME_TPL)
-//         .arg(m_context->fromVersion, m_context->toVersion);
-//   if(!Filesystem::fileExist(metaFilename)){
-//      return;
-//   }
-//   QJsonParseError parserError;
-//   QJsonDocument doc = QJsonDocument::fromJson(Filesystem::fileGetContents(metaFilename), &parserError);
-//   if(QJsonParseError::NoError != parserError.error){
-//      clearState();
-//      throw_exception(ErrorInfo("文件变动元信息JSON文件解析错误"), getErrorContext());
-//   }
-//   QStringList needCopies;
-//   QJsonObject rootObj = doc.object();
-//   QJsonArray itemsVariant = rootObj.take("delete").toArray();
-//   QJsonArray::const_iterator it = itemsVariant.constBegin();
-//   QJsonArray::const_iterator endMarker = itemsVariant.constEnd();
-//   while(it != endMarker){
-//      needCopies.append((*it).toString());
-//      it++;
-//   }
-//   itemsVariant = rootObj.take("modify").toArray();
-//   it = itemsVariant.constBegin();
-//   endMarker = itemsVariant.constEnd();
-//   while(it != endMarker){
-//      needCopies.append((*it).toString());
-//      it++;
-//   }
-//   QString dbBackupDir = m_context->backupDir+"/dbbackup";
-//   if(!Filesystem::dirExist(dbBackupDir)){
-//      Filesystem::createPath(dbBackupDir);
-//   }
-//   for(int i = 0; i < needCopies.size(); i++){
-//      m_context->response->setDataItem("msg", QString("正在备份数据表 %1").arg(needCopies[i]));
-//      writeInterResponse(m_context->request, m_context->response);
-//      dump_mysql_table(m_context->dbUser, m_context->dbPassword, ZHUCHAO_DB_NAME, needCopies[i], dbBackupDir);
-//   }
+   m_step = STEP_BACKUP_DB;
+   m_context->response->setDataItem("step", STEP_BACKUP_DB);
+   m_context->response->setStatus(true);
+   m_context->response->setDataItem("msg", "正在备份数据库");
+   writeInterResponse(m_context->request, *m_context->response);
+   QScopedPointer<DbMetaData> metadata(new DbMetaData(m_dbEngine));
+   QStringList tableNames(metadata->getTableNames(m_context->currentDbname));
+   QString dbBackupDir = m_context->backupDir+"/shop/dbbackup/" + m_context->currentDbname;
+   if(!Filesystem::dirExist(dbBackupDir)){
+      Filesystem::createPath(dbBackupDir);
+   }
+   for(int i = 0; i < tableNames.size(); i++){
+      dump_mysql_table(m_dbUser, m_dbPassword, m_context->currentDbname, tableNames[i], dbBackupDir);
+   }
 }
 
 bool ShopDbUpgraderWrapper::runUpgradeScript()
@@ -225,25 +227,34 @@ bool ShopDbUpgraderWrapper::runUpgradeScript()
    m_context->response->setStatus(true);
    m_context->response->setDataItem("msg", "正在运行升级脚本");
    writeInterResponse(m_context->request, *m_context->response);
-   QString upgradeScriptFilename = m_context->upgradeDir+'/'+QString(ZHUCHAO_UPGRADE_SCRIPT_NAME_TPL)
-         .arg(m_context->fromVersion, m_context->toVersion);
-   if(!Filesystem::fileExist(upgradeScriptFilename)){
-      return true;
-   }
    QSharedPointer<UpgradeEnvEngine> scriptEngine = getUpgradeScriptEngine();
-   return scriptEngine->exec(upgradeScriptFilename);
+   QSharedPointer<UpgradeEnvScriptObject> upgradeEnvScriptObject = scriptEngine->getUpgradeEnvScriptObject();
+   upgradeEnvScriptObject->changeUnderlineDbSchema(m_context->currentDbname);
+   return scriptEngine->exec(m_context->upgradeScript);
+}
+
+void ShopDbUpgraderWrapper::cycleComplete()
+{
+   m_step = STEP_RUN_UPGRADE_SCRIPT;
+   m_context->response->setDataItem("step", STEP_RUN_UPGRADE_SCRIPT);
+   m_context->response->setStatus(true);
+   QSharedPointer<QSqlQuery> query = m_dbEngine->query("SELECT `value` FROM `sys_m_std_config` WHERE `key` = 'dbVersion' AND `sys_m_std_config`.`group` = 'Kernel'");
+   if(query->size() == 0){
+      m_dbEngine->query(QString("INSERT INTO `sys_m_std_config` (`key`, `group`, `value`) VALUES ('dbVersion', 'Kernel', '%1')").arg(m_context->toVersion));
+   }else{
+      m_dbEngine->query(QString("UPDATE `sys_m_std_config` SET `value` = '%1' WHERE `sys_m_std_config`.`key` = 'dbVersion' AND `sys_m_std_config`.`group` = 'Kernel'").arg(m_context->toVersion));
+   }
+   m_context->response->setDataItem("msg", QString("数据库%1升级完成").arg(m_context->currentDbname));
+   writeInterResponse(m_context->request, *m_context->response);
 }
 
 void ShopDbUpgraderWrapper::upgradeComplete()
 {
    m_step= STEP_FINISH;
-//   //更新版本文件
-//   QString versionFilename = m_deployDir + "/VERSION";
-//   Filesystem::filePutContents(versionFilename, m_context->toVersion);
-//   //设置权限
-//   Filesystem::traverseFs(m_deployDir, 0, [&](QFileInfo &fileinfo, int){
-//      Filesystem::chown(fileinfo.absoluteFilePath(), m_userId, m_groupId);
-//   });
+   //更新版本文件
+   if(Filesystem::fileExist(m_context->upgradeDir)){
+      Filesystem::deleteDirRecusive(m_context->upgradeDir);
+   }
    clearState();
 }
 
@@ -308,25 +319,25 @@ QSharedPointer<DownloadClientWrapper> ShopDbUpgraderWrapper::getDownloadClient(c
 
 QSharedPointer<UpgradeEnvEngine> ShopDbUpgraderWrapper::getUpgradeScriptEngine()
 {
-//   if(m_upgradeScriptEngine.isNull()){
-//      m_upgradeScriptEngine.reset(new UpgradeEnvEngine(m_context->dbHost, m_context->dbUser, 
-//                                                       m_context->dbPassword, ZHUCHAO_DB_NAME));
-//      m_upgradeScriptEngine->initUpgradeEnv();
-//      QJSEngine &engine = m_upgradeScriptEngine->getJsEngine();
-//      QJSValue env = engine.newObject();
-//      env.setProperty("backupDir", m_context->backupDir);
-//      env.setProperty("upgradeDir", m_context->upgradeDir);
-//      m_upgradeScriptEngine->registerContextObject("UpgradeMeta", env, true);
-//      connect(m_upgradeScriptEngine.data(),& UpgradeEnvEngine::excpetionSignal, [&](ErrorInfo errorInfo){
-//         m_context->upgradeStatus = false;
-//         m_context->upgradeErrorString = errorInfo.toString();
-//      });
-//      connect(m_upgradeScriptEngine.data(),& UpgradeEnvEngine::logMsgSignal, [&](const QString &msg){
-//         m_context->response->setDataItem("msg", msg);
-//         m_context->response->setDataItem("step", STEP_RUN_UPGRADE_SCRIPT);
-//         writeInterResponse(m_context->request, m_context->response);
-//      });
-//   }
+   if(m_upgradeScriptEngine.isNull()){
+      m_upgradeScriptEngine.reset(new UpgradeEnvEngine(m_dbHost, m_dbUser, 
+                                                       m_dbPassword));
+      m_upgradeScriptEngine->initUpgradeEnv();
+      QJSEngine &engine = m_upgradeScriptEngine->getJsEngine();
+      QJSValue env = engine.newObject();
+      env.setProperty("backupDir", m_context->backupDir);
+      env.setProperty("upgradeDir", m_context->upgradeDir);
+      m_upgradeScriptEngine->registerContextObject("UpgradeMeta", env, true);
+      connect(m_upgradeScriptEngine.data(),& UpgradeEnvEngine::excpetionSignal, [&](ErrorInfo errorInfo){
+         m_context->upgradeStatus = false;
+         m_context->upgradeErrorString = errorInfo.toString();
+      });
+      connect(m_upgradeScriptEngine.data(),& UpgradeEnvEngine::logMsgSignal, [&](const QString &msg){
+         m_context->response->setDataItem("msg", msg);
+         m_context->response->setDataItem("step", STEP_RUN_UPGRADE_SCRIPT);
+         writeInterResponse(m_context->request, *m_context->response);
+      });
+   }
    return m_upgradeScriptEngine;
 }
 

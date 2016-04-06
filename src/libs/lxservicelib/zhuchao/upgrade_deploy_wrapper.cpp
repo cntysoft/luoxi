@@ -76,7 +76,8 @@ ServiceInvokeResponse UpgradeDeployWrapper::upgrade(const ServiceInvokeRequest &
    m_context->response = response;
    downloadUpgradePkg(baseFilename);
    if(!m_context->upgradeStatus){
-      goto process_error;
+      setupFailureResponse(response);
+      return response;
    }
    m_context->response.setDataItem("step", STEP_EXTRA_PKG);
    m_context->response.setDataItem("msg", "正在解压升级压缩包");
@@ -84,36 +85,39 @@ ServiceInvokeResponse UpgradeDeployWrapper::upgrade(const ServiceInvokeRequest &
    writeInterResponse(m_context->request, m_context->response);
    unzipPkg(m_context->pkgFilename);
    if(!m_context->upgradeStatus){
-      goto process_error;
+      setupFailureResponse(response);
+      return response;
    }
    backupScriptFiles();
    upgradeFiles();
    if(!m_context->withoutUpgradeScript){
       runUpgradeScript();
       if(!m_context->upgradeStatus){
-         response.setDataItem("msg", m_context->upgradeErrorString);
-         writeInterResponse(request, response);
-         response.setStatus(false);
-         response.setDataItem("step", STEP_ERROR);
-         response.setError({-1, "升级失败"});
-         clearState();
+         setupFailureResponse(response);
          return response;
       }
    }
    upgradeComplete();
+   setupSuccessResponse(response);
+   return response;
+}
+
+void UpgradeDeployWrapper::setupSuccessResponse(ServiceInvokeResponse &response)
+{
    response.setIsFinal(true);
    response.setStatus(true);
    response.setDataItem("msg", "升级完成");
    response.setDataItem("step", STEP_FINISH);
-   return response;
-process_error:
+}
+
+void UpgradeDeployWrapper::setupFailureResponse(ServiceInvokeResponse &response)
+{
    response.setDataItem("msg", m_context->upgradeErrorString);
-   writeInterResponse(request, response);
+   writeInterResponse(m_context->request, response);
    response.setStatus(false);
    response.setDataItem("step", STEP_ERROR);
    response.setError({-1, "升级失败"});
    clearState();
-   return response;
 }
 
 void UpgradeDeployWrapper::checkVersion()
@@ -124,6 +128,7 @@ void UpgradeDeployWrapper::checkVersion()
       return;
    }
    QString versionStr = QString(Filesystem::fileGetContents(versionFilename));
+   versionStr = versionStr.trimmed();
    Version currentVersion(versionStr);
    Version fromVersion(m_context->fromVersion);
    Version toVersion(m_context->toVersion);

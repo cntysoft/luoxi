@@ -79,6 +79,8 @@ protected:
    QString getUpgradeTmpDir();
    void unzipPkg(const QString &pkgFilename);
    QSharedPointer<UpgradeEnvEngine> getUpgradeScriptEngine();
+   void setupSuccessResponse(ServiceInvokeResponse &response);
+   void setupFailureResponse(ServiceInvokeResponse &response);
 protected:
    virtual void notifySocketDisconnect(QTcpSocket *socket);
 protected:
